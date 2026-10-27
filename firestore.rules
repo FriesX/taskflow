@@ -1,0 +1,226 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model (timestamps are epoch-millis numbers, per src/types.ts)
+// ===============================================================
+//
+// Collection: projects   Doc ID: auto
+//   - name: string 1-100, color: string <=32, icon: string <=64
+//   - ownerId: string (immutable), memberIds: list<string> (<=100, contains owner)
+//   - status: 'active' | 'archived'
+//   - createdAt: number (immutable)
+//   - id: optional string (== doc id)
+//
+// Collection: tasks   Doc ID: auto (id field == doc id)
+//   - id, title (1-200), description (<=5000), status enum, priority int 0-4
+//   - labelIds: list<string> (<=50)
+//   - ownerId (immutable), createdAt (immutable), updatedAt: number
+//   - optional/nullable: startAt, dueAt, completedAt, deletedAt (number|null),
+//     projectId, parentTaskId, assigneeId (string|null)
+//
+// Collection: labels   Doc ID: auto
+//   - name (1-100), color (<=32), ownerId (immutable), id: optional string
+//
+// Collection: users   Doc ID: {uid}
+//   - optional: name, avatar, timezone, language (strings), notificationPreferences (map)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isStr(v, minLen, maxLen) {
+      return v is string && v.size() >= minLen && v.size() <= maxLen;
+    }
+
+    function isNullableNumber(v) {
+      return v == null || v is number;
+    }
+
+    function isNullableId(v) {
+      return v == null || isStr(v, 1, 128);
+    }
+
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function unchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    function projectPath(projectId) {
+      return /databases/$(database)/documents/projects/$(projectId);
+    }
+
+    function isProjectMember(projectId) {
+      return projectId is string && projectId.size() > 0 &&
+        exists(projectPath(projectId)) &&
+        request.auth.uid in get(projectPath(projectId)).data.memberIds;
+    }
+
+    // ===============================================================
+    // Domain Validators (used in BOTH create and update)
+    // ===============================================================
+    function isValidProject(data) {
+      return hasOnlyAllowedFields(data,
+               ['id', 'name', 'color', 'icon', 'ownerId', 'memberIds', 'status', 'createdAt']) &&
+        data.keys().hasAll(['name', 'color', 'icon', 'ownerId', 'memberIds', 'status', 'createdAt']) &&
+        (!('id' in data) || isStr(data.id, 1, 128)) &&
+        isStr(data.name, 1, 100) &&
+        isStr(data.color, 0, 32) &&
+        isStr(data.icon, 0, 64) &&
+        isStr(data.ownerId, 1, 128) &&
+        data.memberIds is list && data.memberIds.size() >= 1 && data.memberIds.size() <= 100 &&
+        data.ownerId in data.memberIds &&
+        data.status in ['active', 'archived'] &&
+        data.createdAt is number;
+    }
+
+    function isValidTask(data) {
+      return hasOnlyAllowedFields(data,
+               ['id', 'title', 'description', 'status', 'priority', 'startAt', 'dueAt',
+                'completedAt', 'projectId', 'parentTaskId', 'labelIds', 'ownerId',
+                'assigneeId', 'deletedAt', 'createdAt', 'updatedAt']) &&
+        data.keys().hasAll(['id', 'title', 'description', 'status', 'priority', 'labelIds',
+                            'ownerId', 'createdAt', 'updatedAt']) &&
+        isStr(data.id, 1, 128) &&
+        isStr(data.title, 1, 200) &&
+        isStr(data.description, 0, 5000) &&
+        data.status in ['todo', 'doing', 'waiting', 'done', 'archived'] &&
+        data.priority is int && data.priority >= 0 && data.priority <= 4 &&
+        (!('startAt' in data) || isNullableNumber(data.startAt)) &&
+        (!('dueAt' in data) || isNullableNumber(data.dueAt)) &&
+        (!('completedAt' in data) || isNullableNumber(data.completedAt)) &&
+        (!('deletedAt' in data) || isNullableNumber(data.deletedAt)) &&
+        (!('projectId' in data) || isNullableId(data.projectId)) &&
+        (!('parentTaskId' in data) || isNullableId(data.parentTaskId)) &&
+        (!('assigneeId' in data) || isNullableId(data.assigneeId)) &&
+        isStr(data.ownerId, 1, 128) &&
+        data.labelIds is list && data.labelIds.size() <= 50 &&
+        data.createdAt is number &&
+        data.updatedAt is number;
+    }
+
+    function isValidLabel(data) {
+      return hasOnlyAllowedFields(data, ['id', 'name', 'color', 'ownerId']) &&
+        data.keys().hasAll(['name', 'color', 'ownerId']) &&
+        (!('id' in data) || isStr(data.id, 1, 128)) &&
+        isStr(data.name, 1, 100) &&
+        isStr(data.color, 0, 32) &&
+        isStr(data.ownerId, 1, 128);
+    }
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(data,
+               ['name', 'avatar', 'timezone', 'language', 'notificationPreferences']) &&
+        (!('name' in data) || isStr(data.name, 0, 100)) &&
+        (!('avatar' in data) || isStr(data.avatar, 0, 2048)) &&
+        (!('timezone' in data) || isStr(data.timezone, 0, 64)) &&
+        (!('language' in data) || isStr(data.language, 0, 16)) &&
+        (!('notificationPreferences' in data) ||
+          (data.notificationPreferences is map && data.notificationPreferences.size() <= 30));
+    }
+
+    // ===============================================================
+    // projects
+    // ===============================================================
+    match /projects/{projectId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.ownerId == request.auth.uid ||
+         request.auth.uid in resource.data.memberIds);
+
+      allow create: if isAuthenticated() &&
+        isValidProject(request.resource.data) &&
+        request.resource.data.ownerId == request.auth.uid &&
+        request.auth.uid in request.resource.data.memberIds;
+
+      allow update: if isAuthenticated() &&
+        resource.data.ownerId == request.auth.uid &&
+        isValidProject(request.resource.data) &&
+        unchanged(['ownerId', 'createdAt']);
+
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // tasks
+    // ===============================================================
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.ownerId == request.auth.uid ||
+         ('projectId' in resource.data && isProjectMember(resource.data.projectId)));
+
+      allow create: if isAuthenticated() &&
+        isValidTask(request.resource.data) &&
+        request.resource.data.id == taskId &&
+        request.resource.data.ownerId == request.auth.uid &&
+        (!('projectId' in request.resource.data) ||
+         request.resource.data.projectId == null ||
+         isProjectMember(request.resource.data.projectId));
+
+      // Owner: full edit (moving to a project requires membership).
+      // Project member (non-owner): may edit, but not reassign project or ownership.
+      allow update: if isAuthenticated() &&
+        isValidTask(request.resource.data) &&
+        request.resource.data.id == taskId &&
+        unchanged(['id', 'ownerId', 'createdAt']) &&
+        (
+          (resource.data.ownerId == request.auth.uid &&
+            (!('projectId' in request.resource.data) ||
+             request.resource.data.projectId == null ||
+             ('projectId' in resource.data && request.resource.data.projectId == resource.data.projectId) ||
+             isProjectMember(request.resource.data.projectId)))
+          ||
+          (('projectId' in resource.data) && isProjectMember(resource.data.projectId) &&
+            unchanged(['projectId']))
+        );
+
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // labels (owner only)
+    // ===============================================================
+    match /labels/{labelId} {
+      allow read: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+        isValidLabel(request.resource.data) &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      allow update: if isAuthenticated() &&
+        resource.data.ownerId == request.auth.uid &&
+        isValidLabel(request.resource.data) &&
+        unchanged(['ownerId']);
+
+      allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ===============================================================
+    // users (private profile; owner only)
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
