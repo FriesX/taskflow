@@ -34,16 +34,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [redirectError, setRedirectError] = useState<unknown>(null)
 
   useEffect(() => {
+    let authSettled = false
+    let redirectSettled = false
+    const finishIfReady = () => {
+      if (authSettled && redirectSettled) setLoading(false)
+    }
+
     // Completes any pending redirect sign-in AND pre-initializes Firebase's popup/redirect
     // iframe on page load so Chrome's user-gesture window never expires before window.open().
-    getRedirectResult(auth, browserPopupRedirectResolver).catch(err => {
-      setRedirectError(err)
+    getRedirectResult(auth, browserPopupRedirectResolver)
+      .then(result => {
+        if (result?.user) setUser(result.user)
+      })
+      .catch(err => {
+        setRedirectError(err)
+      })
+      .finally(() => {
+        redirectSettled = true
+        finishIfReady()
+      })
+
+    const unsub = onAuthStateChanged(auth, u => {
+      setUser(u)
+      authSettled = true
+      finishIfReady()
     })
 
-    return onAuthStateChanged(auth, u => {
-      setUser(u)
-      setLoading(false)
-    })
+    return unsub
   }, [])
 
   const google = async () => {
