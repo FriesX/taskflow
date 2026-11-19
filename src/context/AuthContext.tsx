@@ -1,13 +1,24 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import {
-  GoogleAuthProvider, createUserWithEmailAndPassword, onAuthStateChanged,
-  sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signOut, type User,
+  GoogleAuthProvider,
+  browserPopupRedirectResolver,
+  createUserWithEmailAndPassword,
+  getRedirectResult,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signInWithRedirect,
+  signOut,
+  type User,
 } from 'firebase/auth'
 import { auth } from '../lib/firebase'
 
 interface AuthState {
   user: User | null
   loading: boolean
+  redirectError: unknown
+  clearRedirectError: () => void
   signIn: (email: string, password: string) => Promise<unknown>
   signUp: (email: string, password: string) => Promise<unknown>
   google: () => Promise<unknown>
@@ -20,14 +31,46 @@ const Ctx = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [redirectError, setRedirectError] = useState<unknown>(null)
 
-  useEffect(() => onAuthStateChanged(auth, u => { setUser(u); setLoading(false) }), [])
+  useEffect(() => {
+    // Completes any pending redirect sign-in AND pre-initializes Firebase's popup/redirect
+    // iframe on page load so Chrome's user-gesture window never expires before window.open().
+    getRedirectResult(auth, browserPopupRedirectResolver).catch(err => {
+      setRedirectError(err)
+    })
+
+    return onAuthStateChanged(auth, u => {
+      setUser(u)
+      setLoading(false)
+    })
+  }, [])
+
+  const google = async () => {
+    const provider = new GoogleAuthProvider()
+    provider.setCustomParameters({ prompt: 'select_account' })
+    try {
+      return await signInWithPopup(auth, provider, browserPopupRedirectResolver)
+    } catch (err) {
+      const code = (err as { code?: string })?.code || ''
+      if (
+        code === 'auth/popup-blocked' ||
+        code === 'auth/operation-not-supported-in-this-environment'
+      ) {
+        return signInWithRedirect(auth, provider, browserPopupRedirectResolver)
+      }
+      throw err
+    }
+  }
 
   const value: AuthState = {
-    user, loading,
+    user,
+    loading,
+    redirectError,
+    clearRedirectError: () => setRedirectError(null),
     signIn: (e, p) => signInWithEmailAndPassword(auth, e, p),
     signUp: (e, p) => createUserWithEmailAndPassword(auth, e, p),
-    google: () => signInWithPopup(auth, new GoogleAuthProvider()),
+    google,
     reset: e => sendPasswordResetEmail(auth, e),
     logout: () => signOut(auth),
   }

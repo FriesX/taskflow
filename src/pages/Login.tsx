@@ -10,7 +10,7 @@ import { getTheme, resolveDark, toggleLightDark } from '../lib/theme'
 export default function Login() {
   const { t, i18n } = useTranslation()
   const [searchParams] = useSearchParams()
-  const { signIn, signUp, google, reset } = useAuth()
+  const { signIn, signUp, google, reset, redirectError, clearRedirectError } = useAuth()
   const [mode, setMode] = useState<'in' | 'up'>(() => (searchParams.get('mode') === 'up' ? 'up' : 'in'))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -51,6 +51,7 @@ export default function Login() {
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true)
     setMsg(null)
+    clearRedirectError()
     try {
       await fn()
     } catch (e) {
@@ -59,6 +60,9 @@ export default function Login() {
       setBusy(false)
     }
   }
+
+  const displayMsg =
+    msg ?? (redirectError ? { text: formatAuthError(redirectError), error: true } : null)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -258,17 +262,17 @@ export default function Login() {
               </div>
             </div>
 
-            {msg && (
+            {displayMsg && (
               <div
                 role="alert"
                 className={`flex items-start gap-2.5 rounded-xl border p-3 text-xs font-medium animate-toast-in ${
-                  msg.error
+                  displayMsg.error
                     ? 'border-[var(--danger)]/30 bg-[var(--danger-soft)] text-[var(--danger)]'
                     : 'border-[var(--success)]/30 bg-[var(--success-soft)] text-[var(--success)]'
                 }`}
               >
                 <AlertCircle size={15} className="mt-0.5 shrink-0" />
-                <span>{msg.text}</span>
+                <span>{displayMsg.text}</span>
               </div>
             )}
 
