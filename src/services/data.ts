@@ -2,11 +2,45 @@ import {
   addDoc, collection, deleteDoc, doc, onSnapshot, query, setDoc, updateDoc, where,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { chunkArray } from '../lib/socialLogic'
 import type { Label, Project, Task } from '../types'
 
 export function subscribeTasks(uid: string, cb: (t: Task[]) => void) {
   return onSnapshot(query(collection(db, 'tasks'), where('ownerId', '==', uid)), s =>
     cb(s.docs.map(d => d.data() as Task)))
+}
+
+/** Subscribes to tasks belonging to any project the user is a member of (chunked by 30 for Firestore `in` limit). */
+export function subscribeProjectTasks(projectIds: string[], cb: (t: Task[]) => void) {
+  const chunks = chunkArray(projectIds, 30)
+  if (chunks.length === 0) {
+    cb([])
+    return () => {}
+  }
+
+  const buckets = new Map<number, Task[]>()
+  const emit = () => {
+    const merged: Task[] = []
+    buckets.forEach(list => merged.push(...list))
+    cb(merged)
+  }
+
+  const unsubs = chunks.map((ids, idx) =>
+    onSnapshot(
+      query(collection(db, 'tasks'), where('projectId', 'in', ids)),
+      snap => {
+        buckets.set(idx, snap.docs.map(d => d.data() as Task))
+        emit()
+      },
+      () => {
+        // Ignore transient permission errors if user was just removed from a project
+        buckets.set(idx, [])
+        emit()
+      },
+    ),
+  )
+
+  return () => unsubs.forEach(u => u())
 }
 
 export function subscribeProjects(uid: string, cb: (p: Project[]) => void) {

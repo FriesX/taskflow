@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Calendar, Kanban, List } from 'lucide-react'
+import { ArrowLeft, Calendar, Kanban, List, UserPlus, Users } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { isDeleted, projectProgress } from '../lib/taskLogic'
 import type { Task, TaskStatus } from '../types'
@@ -10,16 +11,19 @@ import TaskDialog from '../components/TaskDialog'
 import KanbanView from '../components/KanbanView'
 import CalendarView from '../components/CalendarView'
 import QuickAdd from '../components/QuickAdd'
+import ProjectMembersDialog from '../components/ProjectMembersDialog'
 
 type ViewMode = 'list' | 'kanban' | 'calendar'
 
 export default function ProjectDetail() {
   const { projectId } = useParams<{ projectId: string }>()
   const { t } = useTranslation()
-  const { projects, tasks } = useData()
+  const { user } = useAuth()
+  const { projects, tasks, profiles } = useData()
   const [view, setView] = useState<ViewMode>('list')
   const [editing, setEditing] = useState<Task | null>(null)
   const [open, setOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
 
   const project = projects.find(p => p.id === projectId)
   const projectTasks = tasks.filter(
@@ -91,6 +95,8 @@ export default function ProjectDetail() {
   }
 
   const progress = projectProgress(project.id, tasks)
+  const isOwner = user?.uid === project.ownerId
+  const visibleMemberIds = project.memberIds.slice(0, 4)
 
   return (
     <div className="max-w-6xl space-y-6">
@@ -103,7 +109,7 @@ export default function ProjectDetail() {
         </Link>
 
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: project.color }} />
             <h1 className="font-display text-2xl font-bold tracking-[-0.025em] text-[var(--ink)] sm:text-3xl">
               {project.name}
@@ -113,32 +119,71 @@ export default function ProjectDetail() {
             </span>
           </div>
 
-          <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-1">
-            {([
-              { id: 'list', label: t('project.viewList'), Icon: List },
-              { id: 'kanban', label: t('project.viewKanban'), Icon: Kanban },
-              { id: 'calendar', label: t('project.viewCalendar'), Icon: Calendar },
-            ] as const).map(({ id, label, Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setView(id)}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
-                  view === id
-                    ? 'bg-[var(--ink)] text-[var(--bg-canvas)]'
-                    : 'text-[var(--ink-secondary)] hover:text-[var(--ink)]'
-                }`}
-              >
-                <Icon size={14} aria-hidden /> {label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Member stack + Invite/Members Trigger */}
+            <button
+              type="button"
+              onClick={() => setMembersOpen(true)}
+              className="btn-secondary px-3 py-1.5 text-xs"
+            >
+              <div className="flex -space-x-1.5">
+                {visibleMemberIds.map(mId => {
+                  const p = profiles[mId]
+                  const label = p?.displayName || p?.email || mId
+                  return p?.photoURL ? (
+                    <img
+                      key={mId}
+                      src={p.photoURL}
+                      alt={label}
+                      referrerPolicy="no-referrer"
+                      className="h-5 w-5 rounded-full border border-[var(--bg-surface)] object-cover"
+                    />
+                  ) : (
+                    <span
+                      key={mId}
+                      className="grid h-5 w-5 place-items-center rounded-full border border-[var(--bg-surface)] bg-[var(--bg-subtle)] font-mono-data text-[9px] font-semibold text-[var(--ink)]"
+                    >
+                      {label.slice(0, 2).toUpperCase()}
+                    </span>
+                  )
+                })}
+              </div>
+              {isOwner ? <UserPlus size={13} aria-hidden /> : <Users size={13} aria-hidden />}
+              <span>
+                {isOwner
+                  ? `${t('projectMembers.inviteButton')} (${project.memberIds.length})`
+                  : t('projectMembers.membersCount', { count: project.memberIds.length })}
+              </span>
+            </button>
+
+            {/* View mode switcher */}
+            <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-1">
+              {([
+                { id: 'list', label: t('project.viewList'), Icon: List },
+                { id: 'kanban', label: t('project.viewKanban'), Icon: Kanban },
+                { id: 'calendar', label: t('project.viewCalendar'), Icon: Calendar },
+              ] as const).map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setView(id)}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                    view === id
+                      ? 'bg-[var(--ink)] text-[var(--bg-canvas)]'
+                      : 'text-[var(--ink-secondary)] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  <Icon size={14} aria-hidden /> {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       {view === 'list' && (
         <div className="max-w-3xl space-y-4">
-          <QuickAdd />
+          <QuickAdd defaultProjectId={project.id} />
           {projectTasks.length === 0 ? (
             <div className="rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--bg-surface)]/60 p-10 text-center">
               <p className="text-sm text-[var(--ink-muted)]">{t('task.empty')}</p>
@@ -182,6 +227,12 @@ export default function ProjectDetail() {
           setOpen(false)
           setEditing(null)
         }}
+      />
+
+      <ProjectMembersDialog
+        project={project}
+        open={membersOpen}
+        onClose={() => setMembersOpen(false)}
       />
     </div>
   )

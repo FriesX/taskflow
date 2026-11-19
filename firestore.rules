@@ -6,10 +6,10 @@ rules_version = '2';
 //
 // Collection: projects   Doc ID: auto
 //   - name: string 1-100, color: string <=32, icon: string <=64
-//   - ownerId: string (immutable), memberIds: list<string> (<=100, contains owner)
+//   - ownerId: string 1-128 (immutable), memberIds: list<string> (1-100, contains owner)
 //   - status: 'active' | 'archived'
 //   - createdAt: number (immutable)
-//   - id: optional string (== doc id)
+//   - id: optional string 1-128
 //
 // Collection: tasks   Doc ID: auto (id field == doc id)
 //   - id, title (1-200), description (<=5000), status enum, priority int 0-4
@@ -21,8 +21,48 @@ rules_version = '2';
 // Collection: labels   Doc ID: auto
 //   - name (1-100), color (<=32), ownerId (immutable), id: optional string
 //
-// Collection: users   Doc ID: {uid}
-//   - optional: name, avatar, timezone, language (strings), notificationPreferences (map)
+// Collection: users   Doc ID: {uid} (private owner-only settings/profile)
+//   - optional: name, avatar, timezone, language (strings), notificationPreferences (map <=30)
+//
+// Collection: profiles   Doc ID: {uid} (collaborator profile card; get-only, no list)
+//   - uid: string 1-128 (== {uid}, immutable)
+//   - displayName: string 1-100
+//   - email: string 0-320
+//   - photoURL: null | string 0-2048
+//   - friendCode: string matching ^TF-[A-Z0-9]{4,8}$ (immutable)
+//   - updatedAt: number
+//
+// Collection: emailIndex   Doc ID: {emailLower} (exact email lookup; get-only, no list)
+//   - uid: string 1-128 (immutable)
+//   - email: string 3-320 (email.lower() == {emailLower}, immutable)
+//   - displayName: string 1-100
+//   - photoURL: null | string 0-2048
+//   - friendCode: string matching ^TF-[A-Z0-9]{4,8}$
+//   - updatedAt: number
+//
+// Collection: friendCodes   Doc ID: {code} (exact friend code lookup; get-only, no list)
+//   - uid: string 1-128 (immutable)
+//   - email: string 0-320
+//   - displayName: string 1-100
+//   - photoURL: null | string 0-2048
+//   - friendCode: string matching ^TF-[A-Z0-9]{4,8}$ (== {code}, immutable)
+//   - updatedAt: number
+//
+// Collection: friendships   Doc ID: {pairId} == users[0] + '_' + users[1]
+//   - id: string (== {pairId}, immutable)
+//   - users: list<string> size 2, sorted users[0] < users[1] (immutable)
+//   - requesterId: string in users (immutable)
+//   - recipientId: string in users, != requesterId (immutable)
+//   - status: 'pending' | 'accepted' (create: 'pending'; update: recipient only pending -> accepted)
+//   - createdAt: number (immutable), updatedAt: number
+//
+// Collection: projectInvites   Doc ID: {inviteId} == projectId + '_' + inviteeId
+//   - id: string (== {inviteId})
+//   - projectId: string 1-128, projectName: string 1-100, projectColor: string 0-32
+//   - inviterId: string 1-128 (must be project owner & accepted friend of invitee)
+//   - inviteeId: string 1-128 (!= inviterId, not already project member)
+//   - status: 'pending' (no updates allowed; delete to decline/cancel/consume)
+//   - createdAt: number
 //
 // ===============================================================
 
@@ -52,6 +92,14 @@ service cloud.firestore {
       return v == null || isStr(v, 1, 128);
     }
 
+    function isNullablePhotoUrl(v) {
+      return v == null || isStr(v, 0, 2048);
+    }
+
+    function isValidFriendCode(v) {
+      return v is string && v.matches('^TF-[A-Z0-9]{4,8}$');
+    }
+
     function hasOnlyAllowedFields(data, fields) {
       return data.keys().hasOnly(fields);
     }
@@ -64,10 +112,68 @@ service cloud.firestore {
       return /databases/$(database)/documents/projects/$(projectId);
     }
 
+    function friendshipPairId(uidA, uidB) {
+      return uidA < uidB ? uidA + '_' + uidB : uidB + '_' + uidA;
+    }
+
+    function friendshipPath(pairId) {
+      return /databases/$(database)/documents/friendships/$(pairId);
+    }
+
+    function isPairParticipant(pairId) {
+      let uid = request.auth.uid;
+      return pairId is string &&
+        pairId.size() > uid.size() + 1 &&
+        (pairId[0 : uid.size() + 1] == uid + '_' ||
+         pairId[pairId.size() - uid.size() - 1 : pairId.size()] == '_' + uid);
+    }
+
+    function projectInvitePath(inviteId) {
+      return /databases/$(database)/documents/projectInvites/$(inviteId);
+    }
+
     function isProjectMember(projectId) {
       return projectId is string && projectId.size() > 0 &&
         exists(projectPath(projectId)) &&
         request.auth.uid in get(projectPath(projectId)).data.memberIds;
+    }
+
+    function areFriends(uidA, uidB) {
+      let pairPath = friendshipPath(friendshipPairId(uidA, uidB));
+      return isStr(uidA, 1, 128) && isStr(uidB, 1, 128) && uidA != uidB &&
+        exists(pairPath) &&
+        get(pairPath).data.status == 'accepted';
+    }
+
+    function canSelfJoinProject(projectId) {
+      let invitePath = projectInvitePath(projectId + '_' + request.auth.uid);
+      let oldMembers = resource.data.memberIds;
+      let newMembers = request.resource.data.memberIds;
+      return resource.data.ownerId != request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds']) &&
+        !(request.auth.uid in oldMembers) &&
+        (request.auth.uid in newMembers) &&
+        newMembers.size() == oldMembers.size() + 1 &&
+        newMembers.hasAll(oldMembers) &&
+        newMembers.toSet().difference(oldMembers.toSet()) == [request.auth.uid].toSet() &&
+        oldMembers.toSet().difference(newMembers.toSet()).size() == 0 &&
+        exists(invitePath) &&
+        get(invitePath).data.inviteeId == request.auth.uid &&
+        get(invitePath).data.projectId == projectId &&
+        get(invitePath).data.status == 'pending';
+    }
+
+    function canSelfLeaveProject() {
+      let oldMembers = resource.data.memberIds;
+      let newMembers = request.resource.data.memberIds;
+      return resource.data.ownerId != request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds']) &&
+        (request.auth.uid in oldMembers) &&
+        !(request.auth.uid in newMembers) &&
+        newMembers.size() == oldMembers.size() - 1 &&
+        oldMembers.hasAll(newMembers) &&
+        oldMembers.toSet().difference(newMembers.toSet()) == [request.auth.uid].toSet() &&
+        newMembers.toSet().difference(oldMembers.toSet()).size() == 0;
     }
 
     // ===============================================================
@@ -133,6 +239,71 @@ service cloud.firestore {
           (data.notificationPreferences is map && data.notificationPreferences.size() <= 30));
     }
 
+    function isValidProfile(data, uid) {
+      return hasOnlyAllowedFields(data,
+               ['uid', 'displayName', 'email', 'photoURL', 'friendCode', 'updatedAt']) &&
+        data.keys().hasAll(['uid', 'displayName', 'email', 'photoURL', 'friendCode', 'updatedAt']) &&
+        isStr(data.uid, 1, 128) &&
+        data.uid == uid &&
+        isStr(data.displayName, 1, 100) &&
+        isStr(data.email, 0, 320) &&
+        isNullablePhotoUrl(data.photoURL) &&
+        isValidFriendCode(data.friendCode) &&
+        data.updatedAt is number;
+    }
+
+    function isValidLookupEntry(data, minEmailLen) {
+      return hasOnlyAllowedFields(data,
+               ['uid', 'email', 'displayName', 'photoURL', 'friendCode', 'updatedAt']) &&
+        data.keys().hasAll(['uid', 'email', 'displayName', 'photoURL', 'friendCode', 'updatedAt']) &&
+        isStr(data.uid, 1, 128) &&
+        isStr(data.email, minEmailLen, 320) &&
+        isStr(data.displayName, 1, 100) &&
+        isNullablePhotoUrl(data.photoURL) &&
+        isValidFriendCode(data.friendCode) &&
+        data.updatedAt is number;
+    }
+
+    function isValidFriendship(data, pairId) {
+      return hasOnlyAllowedFields(data,
+               ['id', 'users', 'requesterId', 'recipientId', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasAll(['id', 'users', 'requesterId', 'recipientId', 'status', 'createdAt', 'updatedAt']) &&
+        isStr(data.id, 1, 257) &&
+        data.id == pairId &&
+        data.users is list &&
+        data.users.size() == 2 &&
+        isStr(data.users[0], 1, 128) &&
+        isStr(data.users[1], 1, 128) &&
+        data.users[0] < data.users[1] &&
+        pairId == data.users[0] + '_' + data.users[1] &&
+        isStr(data.requesterId, 1, 128) &&
+        isStr(data.recipientId, 1, 128) &&
+        data.requesterId in data.users &&
+        data.recipientId in data.users &&
+        data.requesterId != data.recipientId &&
+        data.status in ['pending', 'accepted'] &&
+        data.createdAt is number &&
+        data.updatedAt is number;
+    }
+
+    function isValidProjectInvite(data, inviteId) {
+      return hasOnlyAllowedFields(data,
+               ['id', 'projectId', 'projectName', 'projectColor', 'inviterId',
+                'inviteeId', 'status', 'createdAt']) &&
+        data.keys().hasAll(['id', 'projectId', 'projectName', 'projectColor',
+                            'inviterId', 'inviteeId', 'status', 'createdAt']) &&
+        isStr(data.id, 1, 257) &&
+        data.id == inviteId &&
+        isStr(data.projectId, 1, 128) &&
+        isStr(data.projectName, 1, 100) &&
+        isStr(data.projectColor, 0, 32) &&
+        isStr(data.inviterId, 1, 128) &&
+        isStr(data.inviteeId, 1, 128) &&
+        inviteId == data.projectId + '_' + data.inviteeId &&
+        data.status == 'pending' &&
+        data.createdAt is number;
+    }
+
     // ===============================================================
     // projects
     // ===============================================================
@@ -146,10 +317,17 @@ service cloud.firestore {
         request.resource.data.ownerId == request.auth.uid &&
         request.auth.uid in request.resource.data.memberIds;
 
+      // Owner: full update (ownerId and createdAt immutable).
+      // Invitee: self-join via valid projectInvites/{projectId}_{uid} (memberIds only).
+      // Member (non-owner): self-leave (memberIds only).
       allow update: if isAuthenticated() &&
-        resource.data.ownerId == request.auth.uid &&
         isValidProject(request.resource.data) &&
-        unchanged(['ownerId', 'createdAt']);
+        (
+          (resource.data.ownerId == request.auth.uid &&
+           unchanged(['ownerId', 'createdAt']))
+          || canSelfJoinProject(projectId)
+          || canSelfLeaveProject()
+        );
 
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
@@ -216,6 +394,108 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
       allow update: if isOwner(userId) && isValidUser(request.resource.data);
       allow delete: if isOwner(userId);
+    }
+
+    // ===============================================================
+    // profiles (collaborator profile card; exact get only, no list)
+    // ===============================================================
+    match /profiles/{uid} {
+      allow get: if isAuthenticated();
+      allow list: if false;
+      allow create: if isOwner(uid) && isValidProfile(request.resource.data, uid);
+      allow update: if isOwner(uid) &&
+        isValidProfile(request.resource.data, uid) &&
+        unchanged(['uid', 'friendCode']);
+      allow delete: if isOwner(uid);
+    }
+
+    // ===============================================================
+    // emailIndex (privacy-safe exact email lookup; get only, no list)
+    // ===============================================================
+    match /emailIndex/{emailLower} {
+      allow get: if isAuthenticated();
+      allow list: if false;
+      allow create: if isAuthenticated() &&
+        'email' in request.auth.token &&
+        request.auth.token.email is string &&
+        emailLower == request.auth.token.email.lower() &&
+        request.resource.data.uid == request.auth.uid &&
+        isValidLookupEntry(request.resource.data, 3) &&
+        request.resource.data.email.lower() == emailLower;
+      allow update: if isAuthenticated() &&
+        resource.data.uid == request.auth.uid &&
+        request.resource.data.uid == request.auth.uid &&
+        unchanged(['uid', 'email']) &&
+        isValidLookupEntry(request.resource.data, 3);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // ===============================================================
+    // friendCodes (privacy-safe exact friend code lookup; get only, no list)
+    // ===============================================================
+    match /friendCodes/{code} {
+      allow get: if isAuthenticated();
+      allow list: if false;
+      allow create: if isAuthenticated() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.friendCode == code &&
+        isValidFriendCode(code) &&
+        isValidLookupEntry(request.resource.data, 0);
+      allow update: if isAuthenticated() &&
+        resource.data.uid == request.auth.uid &&
+        request.resource.data.uid == request.auth.uid &&
+        unchanged(['uid', 'friendCode']) &&
+        isValidLookupEntry(request.resource.data, 0);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // ===============================================================
+    // friendships (deterministic sorted pairId)
+    // ===============================================================
+    match /friendships/{pairId} {
+      allow get: if isAuthenticated() &&
+        ((resource != null && request.auth.uid in resource.data.users) ||
+         (resource == null && isPairParticipant(pairId)));
+
+      allow list: if isAuthenticated() && request.auth.uid in resource.data.users;
+
+      allow create: if isAuthenticated() &&
+        isValidFriendship(request.resource.data, pairId) &&
+        request.resource.data.requesterId == request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      allow update: if isAuthenticated() &&
+        isValidFriendship(request.resource.data, pairId) &&
+        request.auth.uid == resource.data.recipientId &&
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'accepted' &&
+        unchanged(['id', 'users', 'requesterId', 'recipientId', 'createdAt']);
+
+      allow delete: if isAuthenticated() && request.auth.uid in resource.data.users;
+    }
+
+    // ===============================================================
+    // projectInvites (owner invites accepted friend; no updates)
+    // ===============================================================
+    match /projectInvites/{inviteId} {
+      allow read: if isAuthenticated() &&
+        (request.auth.uid == resource.data.inviterId ||
+         request.auth.uid == resource.data.inviteeId);
+
+      allow create: if isAuthenticated() &&
+        isValidProjectInvite(request.resource.data, inviteId) &&
+        request.resource.data.inviterId == request.auth.uid &&
+        request.resource.data.inviteeId != request.auth.uid &&
+        exists(projectPath(request.resource.data.projectId)) &&
+        get(projectPath(request.resource.data.projectId)).data.ownerId == request.auth.uid &&
+        !(request.resource.data.inviteeId in get(projectPath(request.resource.data.projectId)).data.memberIds) &&
+        areFriends(request.auth.uid, request.resource.data.inviteeId);
+
+      allow update: if false;
+
+      allow delete: if isAuthenticated() &&
+        (request.auth.uid == resource.data.inviterId ||
+         request.auth.uid == resource.data.inviteeId);
     }
 
     // Default deny

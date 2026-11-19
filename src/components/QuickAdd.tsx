@@ -10,7 +10,7 @@ import { useToast } from '../context/ToastContext'
 
 const LABEL_COLORS = ['#1D4ED8', '#0F766E', '#B45309', '#DC2626', '#0284C7', '#475569']
 
-export default function QuickAdd() {
+export default function QuickAdd({ defaultProjectId }: { defaultProjectId?: string }) {
   const { t } = useTranslation()
   const { user } = useAuth()
   const { labels, projects } = useData()
@@ -34,7 +34,7 @@ export default function QuickAdd() {
         dueAt: parsed.dueAt,
         priority: parsed.priority,
         labelIds,
-        projectId: project?.id ?? null,
+        projectId: project?.id ?? defaultProjectId ?? null,
       })
       success(parsed.title, t('task.new'))
       setText('')

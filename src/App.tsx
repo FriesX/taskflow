@@ -12,6 +12,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const TaskListPage = lazy(() => import('./pages/TaskListPage'))
 const Projects = lazy(() => import('./pages/Projects'))
 const ProjectDetail = lazy(() => import('./pages/ProjectDetail'))
+const Friends = lazy(() => import('./pages/Friends'))
 const CalendarPage = lazy(() => import('./pages/CalendarPage'))
 const Focus = lazy(() => import('./pages/Focus'))
 const Stats = lazy(() => import('./pages/Stats'))
@@ -55,6 +56,7 @@ function AppRoutes() {
             <Route path="upcoming" element={<TaskListPage kind="upcoming" />} />
             <Route path="projects" element={<Projects />} />
             <Route path="projects/:projectId" element={<ProjectDetail />} />
+            <Route path="friends" element={<Friends />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="focus" element={<Focus />} />
             <Route path="stats" element={<Stats />} />

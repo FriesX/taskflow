@@ -16,6 +16,7 @@ import {
   Sun,
   Timer,
   Trash2,
+  Users,
   X,
 } from 'lucide-react'
 import BrandMark from './BrandMark'
@@ -38,6 +39,7 @@ const NAV_GROUPS = [
     groupKey: 'groupWorkspace',
     items: [
       { to: '/projects', key: 'projects', icon: FolderKanban },
+      { to: '/friends', key: 'friends', icon: Users },
       { to: '/calendar', key: 'calendar', icon: Calendar },
       { to: '/focus', key: 'focus', icon: Timer },
       { to: '/stats', key: 'stats', icon: BarChart3 },
@@ -63,7 +65,7 @@ const MOBILE_TABS = [
 export default function Layout() {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const { tasks } = useData()
+  const { tasks, pendingSocialCount } = useData()
   const location = useLocation()
   const [drawerPath, setDrawerPath] = useState<string | null>(null)
   const [isDark, setIsDark] = useState(() => resolveDark(getTheme()))
@@ -80,6 +82,7 @@ export default function Layout() {
     inbox: live.filter(x => x.status !== 'archived' && x.status !== 'done' && !x.projectId && !x.dueAt).length,
     today: live.filter(x => (isToday(x) || isOverdue(x)) && x.status !== 'done').length,
     upcoming: live.filter(x => isUpcoming(x) && x.status !== 'done').length,
+    friends: pendingSocialCount,
     trash: tasks.filter(isDeleted).length,
   }
 

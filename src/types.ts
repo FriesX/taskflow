@@ -37,3 +37,35 @@ export interface Label {
   color: string
   ownerId: string
 }
+
+export interface UserProfile {
+  uid: string
+  displayName: string
+  email: string
+  photoURL: string | null
+  friendCode: string
+  updatedAt: number
+}
+
+export type FriendshipStatus = 'pending' | 'accepted'
+
+export interface Friendship {
+  id: string
+  users: [string, string]
+  requesterId: string
+  recipientId: string
+  status: FriendshipStatus
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ProjectInvite {
+  id: string
+  projectId: string
+  projectName: string
+  projectColor: string
+  inviterId: string
+  inviteeId: string
+  status: 'pending'
+  createdAt: number
+}
