@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Play, Pause, RotateCcw, SkipForward, Volume2, VolumeX, CheckCircle } from 'lucide-react'
+import { Play, Pause, RotateCcw, SkipForward, Volume2, VolumeX, CheckCircle2 } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { isDeleted } from '../lib/taskLogic'
 import { toggleDone } from '../services/data'
@@ -15,20 +15,21 @@ const DURATIONS: Record<Mode, number> = {
 
 function playChime() {
   try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new AudioCtx()
     const osc = ctx.createOscillator()
     const gain = ctx.createGain()
     osc.connect(gain)
     gain.connect(ctx.destination)
     osc.type = 'sine'
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime) // D5
-    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15) // A5
-    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime)
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15)
+    gain.gain.setValueAtTime(0.25, ctx.currentTime)
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8)
     osc.start()
     osc.stop(ctx.currentTime + 0.8)
   } catch {
-    // Ignore audio error if not allowed by browser
+    // Ignore audio error if blocked by browser autoplay policy
   }
 }
 
@@ -43,7 +44,6 @@ export default function Focus() {
   const [soundEnabled, setSoundEnabled] = useState(true)
 
   const timerRef = useRef<number | null>(null)
-
   const activeTasks = tasks.filter(t => !isDeleted(t) && !t.parentTaskId && t.status !== 'done')
   const selectedTask = tasks.find(t => t.id === selectedTaskId)
 
@@ -52,7 +52,7 @@ export default function Focus() {
       timerRef.current = window.setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
-            clearInterval(timerRef.current!)
+            if (timerRef.current) clearInterval(timerRef.current)
             setIsRunning(false)
             if (soundEnabled) playChime()
 
@@ -60,10 +60,9 @@ export default function Focus() {
               setCompletedSessions(c => c + 1)
               setMode('shortBreak')
               return DURATIONS.shortBreak
-            } else {
-              setMode('pomodoro')
-              return DURATIONS.pomodoro
             }
+            setMode('pomodoro')
+            return DURATIONS.pomodoro
           }
           return prev - 1
         })
@@ -94,43 +93,50 @@ export default function Focus() {
   }
 
   const totalDuration = DURATIONS[mode]
-  const progressPercent = Math.round(((totalDuration - timeLeft) / totalDuration) * 100)
+  const progressRatio = (totalDuration - timeLeft) / totalDuration
+  const radius = 104
+  const circumference = 2 * Math.PI * radius
+  const dashOffset = circumference * (1 - progressRatio)
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="font-display text-2xl font-bold tracking-[-0.025em] text-[var(--ink)] sm:text-3xl">
             {t('nav.focus')}
           </h1>
-          <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-            Pomodoro Timer & Focus Flow
+          <p className="mt-1 text-sm text-[var(--ink-secondary)]">
+            {t('focus.subtitle')}
           </p>
         </div>
         <button
+          type="button"
           onClick={() => setSoundEnabled(!soundEnabled)}
-          className="flex items-center gap-1.5 rounded-2xl glass-card px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white border border-slate-200/80 dark:border-slate-800/80 cursor-pointer"
+          className="btn-secondary px-3 py-2 text-xs shrink-0"
           title={t('focus.soundEnabled')}
         >
-          {soundEnabled ? <Volume2 size={16} className="text-indigo-600 dark:text-indigo-400" /> : <VolumeX size={16} />}
+          {soundEnabled ? (
+            <Volume2 size={15} className="text-[var(--accent)]" aria-hidden />
+          ) : (
+            <VolumeX size={15} className="text-[var(--ink-muted)]" aria-hidden />
+          )}
           <span className="hidden sm:inline">{t('focus.soundEnabled')}</span>
         </button>
       </div>
 
-      <div className="relative overflow-hidden rounded-3xl glass-card p-8 md:p-10 text-center border border-slate-200/80 dark:border-slate-800/80 shadow-xl">
-        {/* Ambient subtle glow behind timer */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
-
-        {/* Mode selector pills */}
-        <div className="inline-flex rounded-2xl glass-panel p-1.5 border border-slate-200/70 dark:border-slate-800/70 shadow-xs relative z-10">
+      {/* Studio Timer Card */}
+      <div className="surface-card p-7 sm:p-10 text-center">
+        {/* Mode Switcher */}
+        <div className="inline-flex rounded-xl border border-[var(--border)] bg-[var(--bg-canvas)] p-1">
           {(['pomodoro', 'shortBreak', 'longBreak'] as Mode[]).map(m => (
             <button
               key={m}
+              type="button"
               onClick={() => switchMode(m)}
-              className={`rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 cursor-pointer ${
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
                 mode === m
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-indigo-500/25'
-                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-[var(--ink)] text-[var(--bg-canvas)]'
+                  : 'text-[var(--ink-secondary)] hover:text-[var(--ink)]'
               }`}
             >
               {t(`focus.${m}`)}
@@ -138,85 +144,124 @@ export default function Focus() {
           ))}
         </div>
 
-        {/* Big Countdown Timer */}
-        <div className="my-10 relative z-10">
-          <div className="font-mono text-7xl md:text-8xl font-black tracking-tight bg-gradient-to-br from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-            {formatTime(timeLeft)}
-          </div>
-          {/* Progress bar */}
-          <div className="mx-auto mt-6 h-2.5 max-w-xs overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-700/70">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-teal-400 via-emerald-500 to-teal-500 transition-all duration-300 shadow-xs"
-              style={{ width: `${progressPercent}%` }}
-            />
+        {/* Circular SVG Ring + Countdown */}
+        <div className="my-8 flex justify-center">
+          <div className="relative grid h-60 w-60 place-items-center">
+            <svg className="h-full w-full -rotate-90" viewBox="0 0 240 240" aria-hidden="true">
+              <circle
+                cx="120"
+                cy="120"
+                r={radius}
+                fill="none"
+                stroke="var(--border)"
+                strokeWidth="6"
+              />
+              <circle
+                cx="120"
+                cy="120"
+                r={radius}
+                fill="none"
+                stroke={mode === 'pomodoro' ? 'var(--accent)' : 'var(--success)'}
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+                className="transition-[stroke-dashoffset] duration-300"
+              />
+            </svg>
+            <div className="absolute text-center">
+              <div className="font-mono-data text-5xl font-bold tracking-tight text-[var(--ink)] sm:text-6xl">
+                {formatTime(timeLeft)}
+              </div>
+              <div className="mt-2 font-mono-data text-xs text-[var(--ink-muted)]">
+                {t(`focus.${mode}`)}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-center gap-4 relative z-10">
+        <div className="flex items-center justify-center gap-3">
           <button
-            onClick={() => setIsRunning(!isRunning)}
-            className="btn-gradient-primary flex h-16 w-16 items-center justify-center rounded-3xl shadow-lg cursor-pointer"
-            aria-label={isRunning ? t('focus.pause') : t('focus.start')}
-          >
-            {isRunning ? <Pause size={26} strokeWidth={2.5} /> : <Play size={26} strokeWidth={2.5} className="ml-1" />}
-          </button>
-          <button
+            type="button"
             onClick={resetTimer}
-            className="flex h-12 w-12 items-center justify-center rounded-2xl glass-card text-slate-500 transition-all hover:text-slate-800 dark:hover:text-white hover:scale-105 active:scale-95 cursor-pointer"
+            className="btn-secondary h-11 w-11 p-0"
             aria-label={t('focus.reset')}
           >
-            <RotateCcw size={18} />
+            <RotateCcw size={17} aria-hidden />
           </button>
+
           <button
-            onClick={() => {
-              if (mode === 'pomodoro') switchMode('shortBreak')
-              else switchMode('pomodoro')
-            }}
-            className="flex h-12 w-12 items-center justify-center rounded-2xl glass-card text-slate-500 transition-all hover:text-slate-800 dark:hover:text-white hover:scale-105 active:scale-95 cursor-pointer"
+            type="button"
+            onClick={() => setIsRunning(!isRunning)}
+            className="btn-primary h-12 px-7 text-sm"
+            aria-label={isRunning ? t('focus.pause') : t('focus.start')}
+          >
+            {isRunning ? <Pause size={18} aria-hidden /> : <Play size={18} aria-hidden />}
+            <span>{isRunning ? t('focus.pause') : t('focus.start')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => switchMode(mode === 'pomodoro' ? 'shortBreak' : 'pomodoro')}
+            className="btn-secondary h-11 w-11 p-0"
             aria-label={t('focus.skip')}
           >
-            <SkipForward size={18} />
+            <SkipForward size={17} aria-hidden />
           </button>
         </div>
 
-        {/* Completed Pomodoro Counter */}
-        <div className="mt-8 flex items-center justify-center gap-2 text-xs font-semibold text-slate-500">
-          <span>{t('focus.completedSessions')}:</span>
-          <span className="font-extrabold text-indigo-600 dark:text-indigo-400 text-sm">{completedSessions}</span>
-          <span className="text-base">🍅</span>
+        {/* Completed Sessions Indicator */}
+        <div className="mt-7 flex items-center justify-center gap-3 border-t border-[var(--border)] pt-5 text-xs text-[var(--ink-secondary)]">
+          <span>{t('focus.completedSessions')}</span>
+          <span className="font-mono-data text-sm font-bold text-[var(--ink)]">{completedSessions}</span>
+          <div className="flex items-center gap-1.5" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <span
+                key={idx}
+                className={`h-2 w-2 rounded-full transition-colors ${
+                  idx < completedSessions % 4 || (completedSessions > 0 && completedSessions % 4 === 0)
+                    ? 'bg-[var(--success)]'
+                    : 'bg-[var(--border-strong)]'
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Task Picker Card */}
-      <div className="rounded-3xl glass-card p-6 border border-slate-200/80 dark:border-slate-800/80 shadow-md">
-        <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">
+      <div className="surface-card p-5">
+        <label htmlFor="focus-task-select" className="mb-2 block text-xs font-medium text-[var(--ink-secondary)]">
           {t('focus.selectTask')}
         </label>
         <select
+          id="focus-task-select"
           value={selectedTaskId}
           onChange={e => setSelectedTaskId(e.target.value)}
-          className="w-full rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100"
+          className="input-field"
         >
           <option value="">{t('focus.noTaskSelected')}</option>
-          {activeTasks.map(t => (
-            <option key={t.id} value={t.id}>
-              {t.title}
+          {activeTasks.map(taskItem => (
+            <option key={taskItem.id} value={taskItem.id}>
+              {taskItem.title}
             </option>
           ))}
         </select>
 
         {selectedTask && (
-          <div className="mt-4 flex items-center justify-between rounded-2xl glass-panel p-4 border border-slate-200/60 dark:border-slate-800/60 animate-page-enter">
-            <div className="truncate font-medium text-sm text-slate-800 dark:text-slate-100">{selectedTask.title}</div>
+          <div className="mt-3.5 flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-canvas)] px-4 py-3 animate-view-enter">
+            <div className="truncate text-sm font-medium text-[var(--ink)]">{selectedTask.title}</div>
             <button
+              type="button"
               onClick={() => {
                 toggleDone(selectedTask)
                 setSelectedTaskId('')
               }}
-              className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-teal-500/15 to-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-3 py-1.5 text-xs font-bold hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--success)]/30 bg-[var(--success-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--success)] hover:opacity-85 transition-opacity cursor-pointer"
             >
-              <CheckCircle size={14} /> {t('task.done')}
+              <CheckCircle2 size={14} aria-hidden />
+              <span>{t('task.done')}</span>
             </button>
           </div>
         )}

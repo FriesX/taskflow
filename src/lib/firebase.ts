@@ -9,6 +9,12 @@ import {
 
 const useEmulator = import.meta.env.VITE_USE_EMULATOR === 'true'
 
+if (!useEmulator && !import.meta.env.VITE_FIREBASE_API_KEY) {
+  console.warn(
+    '[TaskFlow] Missing VITE_FIREBASE_API_KEY environment variable. Configure Firebase env vars in .env.local or Vercel Project Settings.',
+  )
+}
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'demo-key',
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'localhost',
@@ -22,7 +28,7 @@ const app = initializeApp(firebaseConfig)
 
 export const auth = getAuth(app)
 
-// Offline persistence enabled
+// Offline persistence enabled across tabs
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
 })

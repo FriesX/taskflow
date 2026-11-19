@@ -33,8 +33,8 @@ export default function TaskListPage({ kind }: { kind: ListKind }) {
   if (!ready) {
     return (
       <div className="max-w-3xl space-y-5">
-        <Skeleton className="h-8 w-44 rounded-xl" />
-        <Skeleton className="h-12 w-full rounded-2xl" />
+        <Skeleton className="h-7 w-44" />
+        <Skeleton className="h-11 w-full rounded-xl" />
         <TaskListSkeleton count={5} />
       </div>
     )
@@ -43,23 +43,25 @@ export default function TaskListPage({ kind }: { kind: ListKind }) {
   const baseList = tasks
     .filter(x => !isDeleted(x) && !x.parentTaskId && filtersMap[kind](x))
     .sort((a, b) => {
-      // Pending first, completed at the end
       if (a.status === 'done' && b.status !== 'done') return 1
       if (a.status !== 'done' && b.status === 'done') return -1
       return (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity) || b.priority - a.priority
     })
 
   const filteredList = filterTasks(baseList, searchQuery, activeFilters)
-  const openTask = (task: Task) => { setEditing(task); setOpen(true) }
+  const openTask = (task: Task) => {
+    setEditing(task)
+    setOpen(true)
+  }
 
   return (
     <div className="max-w-3xl space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+      <div className="flex items-baseline justify-between gap-4 border-b border-[var(--border)] pb-4">
+        <h1 className="font-display text-2xl font-bold tracking-[-0.025em] text-[var(--ink)] sm:text-3xl">
           {t(`nav.${kind}`)}
         </h1>
-        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50">
-          {filteredList.length} {t('task.tasksCount', { count: filteredList.length })}
+        <span className="font-mono-data text-xs font-medium text-[var(--ink-muted)]">
+          {t('task.tasksCount', { count: filteredList.length })}
         </span>
       </div>
 
@@ -73,15 +75,18 @@ export default function TaskListPage({ kind }: { kind: ListKind }) {
       />
 
       {filteredList.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl glass-card border border-dashed border-slate-300 dark:border-slate-800">
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
-            {searchQuery || activeFilters.priority !== 'all' || activeFilters.status !== 'all' || activeFilters.projectId !== 'all'
+        <div className="rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--bg-surface)]/60 p-12 text-center">
+          <p className="text-sm text-[var(--ink-muted)]">
+            {searchQuery ||
+            activeFilters.priority !== 'all' ||
+            activeFilters.status !== 'all' ||
+            activeFilters.projectId !== 'all'
               ? t('search.noResults')
               : t('task.empty')}
           </p>
         </div>
       ) : (
-        <ul className="space-y-2.5">
+        <ul className="space-y-2">
           {filteredList.map(x => (
             <TaskItem key={x.id} task={x} onOpen={openTask} />
           ))}

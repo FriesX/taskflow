@@ -6,14 +6,14 @@ import { createProject } from '../services/data'
 import { useToast } from '../context/ToastContext'
 
 const COLORS = [
-  '#6366f1', // Indigo
-  '#0ea5e9', // Sky
-  '#10b981', // Emerald
-  '#f59e0b', // Amber
-  '#f43f5e', // Rose
-  '#8b5cf6', // Violet
-  '#ec4899', // Pink
-  '#14b8a6', // Teal
+  '#1D4ED8', // Cobalt
+  '#0284C7', // Cerulean
+  '#0F766E', // Forest Teal
+  '#15803D', // Pine
+  '#B45309', // Ochre
+  '#C2410C', // Terracotta
+  '#DC2626', // Vermilion
+  '#475569', // Slate
 ]
 
 const ICONS = [
@@ -62,34 +62,32 @@ export default function ProjectDialog({ open, onClose }: { open: boolean; onClos
     }
   }
 
-  const field =
-    'mt-1.5 w-full rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/60 dark:border-slate-700/80 dark:bg-slate-800/70 dark:text-slate-100 transition-all'
-
   return (
     <dialog
       ref={ref}
       onClose={onClose}
       aria-labelledby="proj-dialog-title"
-      className="m-auto w-full max-w-md rounded-3xl glass-panel p-7 shadow-2xl border border-slate-200/80 dark:border-slate-800/80 backdrop:bg-slate-950/60 backdrop:backdrop-blur-sm"
+      className="surface-elevated m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl p-6 text-[var(--ink)]"
     >
-      <form onSubmit={submit} className="space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
-          <h2 id="proj-dialog-title" className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+      <form onSubmit={submit} className="space-y-5">
+        <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+          <h2 id="proj-dialog-title" className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
             {t('project.new')}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            aria-label={t('common.close')}
+            className="grid h-8 w-8 place-items-center rounded-lg text-[var(--ink-muted)] hover:bg-[var(--bg-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer"
           >
-            <X size={18} />
+            <X size={17} />
           </button>
         </div>
 
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+        <label className="block text-xs font-medium text-[var(--ink-secondary)]">
           {t('project.name')}
           <input
-            className={field}
+            className="input-field mt-1.5"
             required
             maxLength={100}
             placeholder="e.g. Website Launch"
@@ -99,7 +97,7 @@ export default function ProjectDialog({ open, onClose }: { open: boolean; onClos
         </label>
 
         <div>
-          <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+          <span className="mb-2 block text-xs font-medium text-[var(--ink-secondary)]">
             {t('project.color')}
           </span>
           <div className="flex flex-wrap gap-2.5">
@@ -111,7 +109,7 @@ export default function ProjectDialog({ open, onClose }: { open: boolean; onClos
                 style={{ backgroundColor: c }}
                 aria-label={c}
                 className={`h-7 w-7 rounded-full transition-transform cursor-pointer ${
-                  color === c ? 'scale-125 ring-2 ring-indigo-500 ring-offset-2' : 'hover:scale-110'
+                  color === c ? 'scale-115 ring-2 ring-[var(--ink)] ring-offset-2 ring-offset-[var(--bg-surface)]' : 'hover:scale-105'
                 }`}
               />
             ))}
@@ -119,7 +117,7 @@ export default function ProjectDialog({ open, onClose }: { open: boolean; onClos
         </div>
 
         <div>
-          <span className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
+          <span className="mb-2 block text-xs font-medium text-[var(--ink-secondary)]">
             {t('project.icon')}
           </span>
           <div className="flex flex-wrap gap-2">
@@ -128,31 +126,23 @@ export default function ProjectDialog({ open, onClose }: { open: boolean; onClos
                 key={iName}
                 type="button"
                 onClick={() => setIcon(iName)}
-                className={`flex h-10 w-10 items-center justify-center rounded-2xl border transition-all cursor-pointer ${
+                className={`grid h-10 w-10 place-items-center rounded-xl border transition-colors cursor-pointer ${
                   icon === iName
-                    ? 'border-indigo-500 bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 shadow-xs'
-                    : 'border-slate-200 text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800'
+                    ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]'
+                    : 'border-[var(--border)] bg-[var(--bg-canvas)] text-[var(--ink-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--ink)]'
                 }`}
               >
-                <Icon size={18} aria-hidden />
+                <Icon size={17} aria-hidden />
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-200/60 dark:border-slate-800/60">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-2xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
-          >
+        <div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
+          <button type="button" onClick={onClose} className="btn-ghost px-4 py-2 text-sm">
             {t('task.cancel')}
           </button>
-          <button
-            type="submit"
-            disabled={busy}
-            className="btn-gradient-primary rounded-2xl px-5 py-2 text-sm font-semibold cursor-pointer disabled:opacity-60"
-          >
+          <button type="submit" disabled={busy} className="btn-primary px-5 py-2 text-sm">
             {t('task.save')}
           </button>
         </div>

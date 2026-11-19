@@ -37,8 +37,8 @@ export default function Projects() {
     return (
       <div className="max-w-5xl space-y-6">
         <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-36 rounded-xl" />
-          <Skeleton className="h-10 w-32 rounded-xl" />
+          <Skeleton className="h-7 w-36" />
+          <Skeleton className="h-9 w-32" />
         </div>
         <ProjectGridSkeleton count={6} />
       </div>
@@ -49,35 +49,40 @@ export default function Projects() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 border-b border-[var(--border)] pb-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="font-display text-2xl font-bold tracking-[-0.025em] text-[var(--ink)] sm:text-3xl">
             {t('nav.projects')}
           </h1>
-          <p className="text-xs md:text-sm text-slate-500 mt-0.5">
+          <p className="mt-1 font-mono-data text-xs text-[var(--ink-muted)]">
             {activeProjects.length} {t('project.all').toLowerCase()}
           </p>
         </div>
         <button
+          type="button"
           onClick={() => setDialogOpen(true)}
-          className="btn-gradient-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold cursor-pointer"
+          className="btn-primary px-4 py-2 text-sm"
         >
-          <Plus size={18} aria-hidden strokeWidth={2.5} />
+          <Plus size={16} aria-hidden strokeWidth={2.4} />
           <span>{t('project.new')}</span>
         </button>
       </div>
 
       {activeProjects.length === 0 ? (
-        <div className="rounded-3xl glass-card border border-dashed border-slate-300 dark:border-slate-800 p-12 text-center">
-          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-500 mx-auto mb-4">
-            <Folder size={32} />
+        <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--bg-surface)]/60 p-12 text-center">
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl border border-[var(--border)] bg-[var(--bg-subtle)] text-[var(--ink-secondary)]">
+            <Folder size={22} />
           </div>
-          <p className="text-slate-500 max-w-sm mx-auto mb-4 text-sm leading-relaxed">{t('project.empty')}</p>
+          <p className="mx-auto mb-5 max-w-sm text-sm leading-relaxed text-[var(--ink-secondary)]">
+            {t('project.empty')}
+          </p>
           <button
+            type="button"
             onClick={() => setDialogOpen(true)}
-            className="btn-gradient-primary rounded-xl px-4 py-2.5 text-sm font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+            className="btn-primary px-4 py-2 text-sm"
           >
-            <Plus size={16} aria-hidden strokeWidth={2.5} /> {t('project.new')}
+            <Plus size={16} aria-hidden />
+            <span>{t('project.new')}</span>
           </button>
         </div>
       ) : (
@@ -92,33 +97,33 @@ export default function Projects() {
               <Link
                 key={p.id}
                 to={`/projects/${p.id}`}
-                className="group flex flex-col justify-between rounded-3xl glass-card p-6 border border-slate-200/70 dark:border-slate-800/70 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl"
+                className="surface-interactive group flex flex-col justify-between p-5"
               >
                 <div>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="mb-4 flex items-center justify-between">
                     <div
-                      className="flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-md transition-transform group-hover:scale-105"
+                      className="grid h-10 w-10 place-items-center rounded-xl text-white"
                       style={{ backgroundColor: p.color }}
                     >
-                      <Icon size={20} aria-hidden />
+                      <Icon size={18} aria-hidden />
                     </div>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">
+                    <span className="rounded-md bg-[var(--bg-subtle)] px-2 py-0.5 font-mono-data text-[11px] font-medium text-[var(--ink-secondary)]">
                       {projTasks.length} {t('stats.totalTasks').toLowerCase()}
                     </span>
                   </div>
-                  <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
+                  <h2 className="truncate font-display text-base font-bold text-[var(--ink)] group-hover:text-[var(--accent)] transition-colors">
                     {p.name}
                   </h2>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80">
-                  <div className="flex justify-between text-xs font-medium text-slate-500 mb-2">
+                <div className="mt-6 border-t border-[var(--border)] pt-3.5">
+                  <div className="mb-2 flex justify-between font-mono-data text-xs text-[var(--ink-muted)]">
                     <span>{progress}% {t('task.completed')}</span>
-                    <span>{completedCount} / {projTasks.length}</span>
+                    <span>{completedCount}/{projTasks.length}</span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-500 transition-all duration-500 shadow-xs"
+                      className="h-full rounded-full bg-[var(--success)] transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
                   </div>

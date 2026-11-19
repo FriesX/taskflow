@@ -28,16 +28,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  const showToast = useCallback(({ message, title, type = 'info', duration = 3500 }: Omit<ToastItem, 'id'>) => {
-    const id = Math.random().toString(36).substring(2, 9)
-    setToasts(prev => [...prev, { id, message, title, type, duration }])
-
-    if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id)
-      }, duration)
-    }
-  }, [removeToast])
+  const showToast = useCallback(
+    ({ message, title, type = 'info', duration = 3400 }: Omit<ToastItem, 'id'>) => {
+      const id = Math.random().toString(36).substring(2, 9)
+      setToasts(prev => [...prev, { id, message, title, type, duration }])
+      if (duration > 0) {
+        setTimeout(() => removeToast(id), duration)
+      }
+    },
+    [removeToast],
+  )
 
   const success = useCallback((message: string, title?: string) => {
     showToast({ message, title, type: 'success' })
@@ -54,42 +54,35 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast, success, error, info, removeToast }}>
       {children}
-      {/* Toast floating container */}
       <div
         aria-live="polite"
-        className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
+        className="fixed bottom-5 right-5 z-50 flex w-full max-w-sm flex-col gap-2 pointer-events-none px-4 sm:px-0"
       >
-        {toasts.map(t => {
-          const isSuccess = t.type === 'success'
-          const isError = t.type === 'error'
-
+        {toasts.map(item => {
+          const isSuccess = item.type === 'success'
+          const isError = item.type === 'error'
           return (
             <div
-              key={t.id}
+              key={item.id}
               role="status"
-              className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl backdrop-blur-xl border shadow-xl animate-toast-bounce transition-all ${
-                isSuccess
-                  ? 'bg-emerald-950/80 border-emerald-500/40 text-emerald-100 shadow-emerald-500/10'
-                  : isError
-                  ? 'bg-rose-950/80 border-rose-500/40 text-rose-100 shadow-rose-500/10'
-                  : 'bg-slate-900/85 border-slate-700/60 text-slate-100 shadow-indigo-500/10'
-              }`}
+              className="surface-elevated pointer-events-auto flex items-start gap-3 rounded-xl px-4 py-3 text-sm animate-toast-in"
             >
               <div className="mt-0.5 shrink-0">
-                {isSuccess && <CheckCircle2 className="h-5 w-5 text-emerald-400" aria-hidden />}
-                {isError && <AlertCircle className="h-5 w-5 text-rose-400" aria-hidden />}
-                {!isSuccess && !isError && <Info className="h-5 w-5 text-indigo-400" aria-hidden />}
+                {isSuccess && <CheckCircle2 className="h-4 w-4 text-[var(--success)]" aria-hidden />}
+                {isError && <AlertCircle className="h-4 w-4 text-[var(--danger)]" aria-hidden />}
+                {!isSuccess && !isError && <Info className="h-4 w-4 text-[var(--accent)]" aria-hidden />}
               </div>
-              <div className="flex-1 text-sm">
-                {t.title && <div className="font-semibold text-white mb-0.5">{t.title}</div>}
-                <div className="opacity-90 leading-relaxed">{t.message}</div>
+              <div className="min-w-0 flex-1">
+                {item.title && <div className="font-semibold text-[var(--ink)]">{item.title}</div>}
+                <div className="truncate text-xs text-[var(--ink-secondary)] leading-relaxed">{item.message}</div>
               </div>
               <button
-                onClick={() => removeToast(t.id)}
-                className="shrink-0 p-1 rounded-lg opacity-60 hover:opacity-100 hover:bg-white/10 transition-opacity"
+                type="button"
+                onClick={() => removeToast(item.id)}
+                className="shrink-0 rounded-md p-1 text-[var(--ink-muted)] hover:bg-[var(--bg-subtle)] hover:text-[var(--ink)] cursor-pointer"
                 aria-label="Close notification"
               >
-                <X size={15} />
+                <X size={14} />
               </button>
             </div>
           )
@@ -101,8 +94,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 export function useToast() {
   const ctx = useContext(ToastContext)
-  if (!ctx) {
-    throw new Error('useToast must be used within a ToastProvider')
-  }
+  if (!ctx) throw new Error('useToast must be used within a ToastProvider')
   return ctx
 }

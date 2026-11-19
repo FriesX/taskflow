@@ -1,12 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  ArrowLeft,
-  Calendar,
-  Kanban,
-  List,
-} from 'lucide-react'
+import { ArrowLeft, Calendar, Kanban, List } from 'lucide-react'
 import { useData } from '../context/DataContext'
 import { isDeleted, projectProgress } from '../lib/taskLogic'
 import type { Task, TaskStatus } from '../types'
@@ -87,10 +82,10 @@ export default function ProjectDetail() {
   if (!project) {
     return (
       <div className="space-y-4">
-        <Link to="/projects" className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
-          <ArrowLeft size={16} aria-hidden /> {t('project.all')}
+        <Link to="/projects" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--accent)] hover:underline">
+          <ArrowLeft size={15} aria-hidden /> {t('project.all')}
         </Link>
-        <p className="text-slate-500">Project not found.</p>
+        <p className="text-sm text-[var(--ink-muted)]">Project not found.</p>
       </div>
     )
   }
@@ -99,70 +94,55 @@ export default function ProjectDetail() {
 
   return (
     <div className="max-w-6xl space-y-6">
-      {/* Back button & Header */}
-      <div>
+      <div className="border-b border-[var(--border)] pb-4">
         <Link
           to="/projects"
-          className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+          className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-[var(--ink-muted)] hover:text-[var(--ink)] transition-colors"
         >
-          <ArrowLeft size={15} aria-hidden /> {t('project.all')}
+          <ArrowLeft size={14} aria-hidden /> {t('project.all')}
         </Link>
+
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span
-              className="h-5 w-5 rounded-full shadow-xs"
-              style={{ backgroundColor: project.color }}
-            />
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: project.color }} />
+            <h1 className="font-display text-2xl font-bold tracking-[-0.025em] text-[var(--ink)] sm:text-3xl">
               {project.name}
             </h1>
-            <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300">
+            <span className="rounded-md bg-[var(--success-soft)] px-2.5 py-1 font-mono-data text-xs font-semibold text-[var(--success)]">
               {progress}% {t('task.completed')}
             </span>
           </div>
 
-          {/* View mode switcher */}
-          <div className="flex items-center rounded-2xl glass-panel p-1 border border-slate-200/80 dark:border-slate-800/80 shadow-xs">
-            <button
-              onClick={() => setView('list')}
-              className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                view === 'list'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <List size={15} aria-hidden /> {t('project.viewList')}
-            </button>
-            <button
-              onClick={() => setView('kanban')}
-              className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                view === 'kanban'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Kanban size={15} aria-hidden /> {t('project.viewKanban')}
-            </button>
-            <button
-              onClick={() => setView('calendar')}
-              className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                view === 'calendar'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
-              }`}
-            >
-              <Calendar size={15} aria-hidden /> {t('project.viewCalendar')}
-            </button>
+          <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-1">
+            {([
+              { id: 'list', label: t('project.viewList'), Icon: List },
+              { id: 'kanban', label: t('project.viewKanban'), Icon: Kanban },
+              { id: 'calendar', label: t('project.viewCalendar'), Icon: Calendar },
+            ] as const).map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setView(id)}
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                  view === id
+                    ? 'bg-[var(--ink)] text-[var(--bg-canvas)]'
+                    : 'text-[var(--ink-secondary)] hover:text-[var(--ink)]'
+                }`}
+              >
+                <Icon size={14} aria-hidden /> {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Main View Content */}
       {view === 'list' && (
         <div className="max-w-3xl space-y-4">
           <QuickAdd />
           {projectTasks.length === 0 ? (
-            <p className="text-slate-500">{t('task.empty')}</p>
+            <div className="rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--bg-surface)]/60 p-10 text-center">
+              <p className="text-sm text-[var(--ink-muted)]">{t('task.empty')}</p>
+            </div>
           ) : (
             <ul className="space-y-2">
               {projectTasks

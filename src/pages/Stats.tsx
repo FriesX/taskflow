@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   BarChart,
   Bar,
+  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
@@ -28,7 +29,6 @@ export default function Stats() {
   const overdue = liveTasks.filter(t => isOverdue(t)).length
   const rate = total > 0 ? Math.round((completed / total) * 100) : 0
 
-  // 7-day productivity trend
   const chartData = useMemo(() => {
     const today = new Date()
     return Array.from({ length: 7 }).map((_, i) => {
@@ -55,131 +55,126 @@ export default function Stats() {
     return <StatsSkeleton />
   }
 
+  const activeProjects = projects.filter(p => p.status === 'active')
+
   return (
-    <div className="max-w-5xl space-y-8">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+    <div className="max-w-5xl space-y-7">
+      <div className="border-b border-[var(--border)] pb-4">
+        <h1 className="font-display text-2xl font-bold tracking-[-0.025em] text-[var(--ink)] sm:text-3xl">
           {t('nav.stats')}
         </h1>
-        <p className="text-xs md:text-sm text-slate-500 mt-0.5">
+        <p className="mt-1 text-sm text-[var(--ink-secondary)]">
           {t('stats.overview')}
         </p>
       </div>
 
-      {/* Metric Cards with Asymmetric Grid & Micro-interactions */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="group rounded-3xl glass-card p-5 border border-slate-200/70 dark:border-slate-800/70 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('stats.totalTasks')}</span>
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-indigo-500/15 to-purple-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-200/40 dark:border-indigo-800/40 group-hover:scale-110 transition-transform">
-              <ListTodo size={18} />
-            </div>
+      {/* KPI Strip */}
+      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+        <div className="surface-card p-5">
+          <div className="flex items-center justify-between text-xs font-medium text-[var(--ink-secondary)]">
+            <span>{t('stats.totalTasks')}</span>
+            <ListTodo size={15} className="text-[var(--ink-muted)]" aria-hidden />
           </div>
-          <div className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">{total}</div>
+          <div className="mt-2.5 font-mono-data text-3xl font-bold text-[var(--ink)]">{total}</div>
         </div>
 
-        <div className="group rounded-3xl glass-card p-5 border border-slate-200/70 dark:border-slate-800/70 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('stats.completedTasks')}</span>
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-teal-500/15 to-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-200/40 dark:border-emerald-800/40 group-hover:scale-110 transition-transform">
-              <CheckCircle2 size={18} />
-            </div>
+        <div className="surface-card p-5">
+          <div className="flex items-center justify-between text-xs font-medium text-[var(--ink-secondary)]">
+            <span>{t('stats.completedTasks')}</span>
+            <CheckCircle2 size={15} className="text-[var(--success)]" aria-hidden />
           </div>
-          <div className="text-3xl font-extrabold bg-gradient-to-r from-teal-500 to-emerald-600 bg-clip-text text-transparent">
-            {completed}
-          </div>
+          <div className="mt-2.5 font-mono-data text-3xl font-bold text-[var(--success)]">{completed}</div>
         </div>
 
-        <div className="group rounded-3xl glass-card p-5 border border-slate-200/70 dark:border-slate-800/70 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('stats.completionRate')}</span>
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-blue-500/15 to-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-200/40 dark:border-indigo-800/40 group-hover:scale-110 transition-transform">
-              <TrendingUp size={18} />
-            </div>
+        <div className="surface-card p-5">
+          <div className="flex items-center justify-between text-xs font-medium text-[var(--ink-secondary)]">
+            <span>{t('stats.completionRate')}</span>
+            <TrendingUp size={15} className="text-[var(--accent)]" aria-hidden />
           </div>
-          <div className="text-3xl font-extrabold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            {rate}%
-          </div>
+          <div className="mt-2.5 font-mono-data text-3xl font-bold text-[var(--accent)]">{rate}%</div>
         </div>
 
-        <div className="group rounded-3xl glass-card p-5 border border-slate-200/70 dark:border-slate-800/70 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('stats.overdueTasks')}</span>
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-rose-500/15 to-red-500/15 text-rose-600 dark:text-rose-400 border border-rose-200/40 dark:border-rose-800/40 group-hover:scale-110 transition-transform">
-              <Clock size={18} />
-            </div>
+        <div className="surface-card p-5">
+          <div className="flex items-center justify-between text-xs font-medium text-[var(--ink-secondary)]">
+            <span>{t('stats.overdueTasks')}</span>
+            <Clock size={15} className="text-[var(--danger)]" aria-hidden />
           </div>
-          <div className="text-3xl font-extrabold text-rose-600 dark:text-rose-400">
-            {overdue}
-          </div>
+          <div className="mt-2.5 font-mono-data text-3xl font-bold text-[var(--danger)]">{overdue}</div>
         </div>
       </div>
 
-      {/* Weekly Chart with Dynamic Gradient Bars */}
-      <section className="rounded-3xl glass-card p-6 border border-slate-200/70 dark:border-slate-800/70">
-        <h2 className="mb-6 text-lg font-bold text-slate-800 dark:text-slate-100">{t('stats.weeklyTrend')}</h2>
-        <div className="h-68 w-full">
+      {/* 7-Day Productivity Chart */}
+      <section className="surface-card p-6">
+        <h2 className="mb-6 font-display text-base font-bold text-[var(--ink)]">
+          {t('stats.weeklyTrend')}
+        </h2>
+        <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="productivityGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.9} />
-                  <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.7} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#94a3b8' }} stroke="#cbd5e1" strokeDasharray="3 3" />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#94a3b8' }} stroke="#cbd5e1" />
+            <BarChart data={chartData} margin={{ top: 8, right: 8, left: -24, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontFamily: 'JetBrains Mono, monospace' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12, fill: 'var(--ink-muted)', fontFamily: 'JetBrains Mono, monospace' }}
+                axisLine={false}
+                tickLine={false}
+              />
               <Tooltip
+                cursor={{ fill: 'var(--bg-subtle)', opacity: 0.6 }}
                 contentStyle={{
-                  backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                  backdropFilter: 'blur(12px)',
-                  borderColor: 'rgba(51, 65, 85, 0.6)',
-                  borderRadius: '1rem',
-                  color: '#f8fafc',
+                  backgroundColor: 'var(--bg-surface)',
+                  borderColor: 'var(--border-strong)',
+                  borderRadius: '10px',
+                  color: 'var(--ink)',
                   fontSize: '12px',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                  boxShadow: 'var(--shadow-md)',
                 }}
-                formatter={(val) => [`${val} tasks`, t('stats.tasksCompleted')]}
+                formatter={(val) => [`${val}`, t('stats.tasksCompleted')]}
                 labelFormatter={(label) => `${label}`}
               />
-              <Bar dataKey="completed" fill="url(#productivityGradient)" radius={[8, 8, 2, 2]} />
+              <Bar dataKey="completed" fill="var(--accent)" radius={[6, 6, 0, 0]} maxBarSize={44} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </section>
 
-      {/* Project Breakdown with Toska-to-Emerald Progress Bars */}
-      {projects.filter(p => p.status === 'active').length > 0 && (
-        <section className="rounded-3xl glass-card p-6 border border-slate-200/70 dark:border-slate-800/70">
-          <h2 className="mb-4 text-lg font-bold text-slate-800 dark:text-slate-100">{t('stats.projectBreakdown')}</h2>
+      {/* Project Breakdown */}
+      {activeProjects.length > 0 && (
+        <section className="surface-card p-6">
+          <h2 className="mb-5 font-display text-base font-bold text-[var(--ink)]">
+            {t('stats.projectBreakdown')}
+          </h2>
           <div className="space-y-4">
-            {projects
-              .filter(p => p.status === 'active')
-              .map(p => {
-                const projTasks = liveTasks.filter(t => t.projectId === p.id)
-                const doneCount = projTasks.filter(t => t.status === 'done').length
-                const prog = projectProgress(p.id, tasks)
+            {activeProjects.map(p => {
+              const projTasks = liveTasks.filter(t => t.projectId === p.id)
+              const doneCount = projTasks.filter(t => t.status === 'done').length
+              const prog = projectProgress(p.id, tasks)
 
-                return (
-                  <div key={p.id} className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200">
-                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: p.color }} />
-                        {p.name}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-500">
-                        {doneCount} / {projTasks.length} ({prog}%)
-                      </span>
-                    </div>
-                    <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-500 transition-all duration-500 shadow-xs"
-                        style={{ width: `${prog}%` }}
-                      />
-                    </div>
+              return (
+                <div key={p.id} className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="flex items-center gap-2 font-medium text-[var(--ink)]">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: p.color }} />
+                      {p.name}
+                    </span>
+                    <span className="font-mono-data text-xs text-[var(--ink-muted)]">
+                      {doneCount}/{projTasks.length} ({prog}%)
+                    </span>
                   </div>
-                )
-              })}
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                    <div
+                      className="h-full rounded-full bg-[var(--success)] transition-all duration-300"
+                      style={{ width: `${prog}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </section>
       )}

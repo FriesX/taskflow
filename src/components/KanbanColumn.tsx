@@ -4,11 +4,11 @@ import { Plus } from 'lucide-react'
 import type { Task, TaskStatus } from '../types'
 import KanbanCard from './KanbanCard'
 
-const STATUS_BORDER: Record<string, string> = {
-  todo: 'border-slate-300 dark:border-slate-600',
-  doing: 'border-sky-400 dark:border-sky-600',
-  waiting: 'border-amber-400 dark:border-amber-600',
-  done: 'border-emerald-400 dark:border-emerald-600',
+const STATUS_DOT: Record<string, string> = {
+  todo: 'bg-[var(--ink-muted)]',
+  doing: 'bg-[var(--accent)]',
+  waiting: 'bg-[var(--warning)]',
+  done: 'bg-[var(--success)]',
 }
 
 export default function KanbanColumn({
@@ -28,23 +28,29 @@ export default function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex flex-col rounded-2xl border-t-4 bg-slate-100 p-3 dark:bg-slate-900/60 transition-colors min-h-[400px] ${
-        STATUS_BORDER[status] || 'border-slate-300'
-      } ${isOver ? 'bg-primary/5 ring-2 ring-primary' : ''}`}
+      className={`flex min-h-[420px] flex-col rounded-2xl border p-3 transition-colors ${
+        isOver
+          ? 'border-[var(--accent)] bg-[var(--accent-soft)]'
+          : 'border-[var(--border)] bg-[var(--bg-subtle)]/70'
+      }`}
     >
       <div className="mb-3 flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm">{t(`kanban.${status}`)}</span>
-          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium dark:bg-slate-700">
+          <span className={`h-2 w-2 rounded-full ${STATUS_DOT[status] || STATUS_DOT.todo}`} />
+          <span className="font-display text-xs font-semibold text-[var(--ink)]">
+            {t(`kanban.${status}`)}
+          </span>
+          <span className="rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-1.5 py-0.5 font-mono-data text-[11px] text-[var(--ink-muted)]">
             {tasks.length}
           </span>
         </div>
         <button
+          type="button"
           onClick={() => onQuickAdd(status)}
           aria-label={t('common.add')}
-          className="rounded-lg p-1 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+          className="grid h-7 w-7 place-items-center rounded-lg text-[var(--ink-muted)] hover:bg-[var(--bg-surface)] hover:text-[var(--ink)] transition-colors cursor-pointer"
         >
-          <Plus size={16} aria-hidden />
+          <Plus size={15} aria-hidden />
         </button>
       </div>
 
@@ -53,7 +59,7 @@ export default function KanbanColumn({
           <KanbanCard key={task.id} task={task} onOpen={onOpen} />
         ))}
         {tasks.length === 0 && (
-          <div className="grid h-24 place-items-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-400 dark:border-slate-700">
+          <div className="grid h-24 place-items-center rounded-xl border border-dashed border-[var(--border-strong)] text-xs text-[var(--ink-muted)]">
             {t('kanban.emptyCol')}
           </div>
         )}

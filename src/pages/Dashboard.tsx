@@ -1,10 +1,20 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, CalendarClock, CheckCircle2, Flame, FolderKanban, Star } from 'lucide-react'
+import { format } from 'date-fns'
+import { AlertCircle, ArrowUpRight, CalendarClock, CheckCircle2, FolderKanban, Star } from 'lucide-react'
 import type { Task } from '../types'
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
-import { isOverdue, isToday, isUpcoming, isDeleted, isCompletedToday, projectProgress, todaySummary } from '../lib/taskLogic'
+import {
+  isCompletedToday,
+  isDeleted,
+  isOverdue,
+  isToday,
+  isUpcoming,
+  projectProgress,
+  todaySummary,
+} from '../lib/taskLogic'
 import TaskItem from '../components/TaskItem'
 import TaskDialog from '../components/TaskDialog'
 import QuickAdd from '../components/QuickAdd'
@@ -16,6 +26,7 @@ export default function Dashboard() {
   const { tasks, projects, ready } = useData()
   const [editing, setEditing] = useState<Task | null>(null)
   const [open, setOpen] = useState(false)
+  const [now] = useState(() => new Date())
 
   if (!ready) {
     return <DashboardSkeleton />
@@ -28,117 +39,109 @@ export default function Dashboard() {
     .filter(x => (isToday(x) || isCompletedToday(x)) && !isOverdue(x))
     .sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0))
   const upcoming = live.filter(x => isUpcoming(x) && x.status !== 'done')
-  const hour = new Date().getHours()
+  const hour = now.getHours()
   const greeting = hour < 12 ? 'greetingMorning' : hour < 18 ? 'greetingAfternoon' : 'greetingEvening'
   const name = user?.displayName ?? user?.email?.split('@')[0] ?? ''
-  const openTask = (task: Task) => { setEditing(task); setOpen(true) }
+  const openTask = (task: Task) => {
+    setEditing(task)
+    setOpen(true)
+  }
+
+  const activeProjects = projects.filter(p => p.status === 'active')
 
   return (
-    <div className="max-w-4xl space-y-6">
-      {/* Modern Asymmetric Hero Card */}
-      <section className="relative overflow-hidden rounded-3xl glass-card p-6 md:p-8 border border-slate-200/80 dark:border-slate-800/80 shadow-md">
-        {/* Subtle decorative gradient background flare */}
-        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-gradient-to-br from-indigo-500/20 to-purple-500/20 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-gradient-to-tr from-teal-500/15 to-emerald-500/15 blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="max-w-4xl space-y-7">
+      {/* Editorial Header + Progress Card */}
+      <section className="surface-card p-6 sm:p-7">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-indigo-500/15 to-purple-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-800/50 mb-3">
-              <Flame size={14} className="text-amber-500 animate-bounce" />
-              <span>TaskFlow Workspace</span>
+            <div className="font-mono-data text-xs text-[var(--ink-muted)]">
+              {format(now, 'EEEE, MMMM d, yyyy')}
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-              {t(`task.${greeting}`)}{name ? `, ${name}` : ''}
+            <h1 className="mt-1 font-display text-2xl font-bold tracking-[-0.025em] text-[var(--ink)] sm:text-3xl">
+              {t(`task.${greeting}`)}
+              {name ? `, ${name}` : ''}
             </h1>
-            <p className="text-sm md:text-base text-slate-500 dark:text-slate-400 mt-1 max-w-lg">
+            <p className="mt-1.5 text-sm text-[var(--ink-secondary)]">
               {summary.remaining > 0
                 ? `${summary.remaining} ${t('task.left')}, ${summary.done} ${t('task.completed')}`
                 : t('task.empty')}
             </p>
           </div>
 
-          <div className="flex md:flex-col items-center md:items-end justify-between border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-slate-800">
-            <span className="text-3xl font-extrabold bg-gradient-to-r from-teal-500 to-emerald-600 bg-clip-text text-transparent">
+          <div className="flex items-baseline gap-2 sm:flex-col sm:items-end sm:gap-0.5">
+            <span className="font-mono-data text-3xl font-bold tracking-tight text-[var(--success)]">
               {summary.percent}%
             </span>
-            <span className="text-xs font-medium text-slate-400">
+            <span className="font-mono-data text-xs text-[var(--ink-muted)]">
               {summary.done} / {summary.total} {t('task.completed')}
             </span>
           </div>
         </div>
 
-        {/* Dynamic Toska-to-Emerald Progress bar */}
-        <div className="relative mt-5">
+        <div
+          role="progressbar"
+          aria-valuenow={summary.percent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="mt-5 h-2 overflow-hidden rounded-full bg-[var(--bg-subtle)]"
+        >
           <div
-            role="progressbar"
-            aria-valuenow={summary.percent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            className="h-3 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-700/80 p-0.5"
-          >
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-teal-400 via-emerald-500 to-emerald-600 transition-all duration-500 shadow-xs shadow-emerald-500/30"
-              style={{ width: `${summary.percent}%` }}
-            />
-          </div>
+            className="h-full rounded-full bg-[var(--success)] transition-all duration-500"
+            style={{ width: `${summary.percent}%` }}
+          />
         </div>
       </section>
 
-      {/* Quick Add with glassmorphism */}
+      {/* Quick Add */}
       <QuickAdd />
 
-      {/* Dynamic Metric Stat Cards with Micro-interactions */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <div className="group glass-card p-4 md:p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              {t('task.overdue')}
-            </span>
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-rose-500/15 to-red-500/15 text-rose-600 dark:text-rose-400 border border-rose-200/40 dark:border-rose-800/40 group-hover:scale-110 transition-transform">
-              <AlertCircle size={18} />
-            </div>
+      {/* Precision KPI Strip */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+        <Link to="/today" className="surface-interactive p-5">
+          <div className="flex items-center justify-between text-xs font-medium text-[var(--ink-secondary)]">
+            <span>{t('task.overdue')}</span>
+            <AlertCircle size={15} className="text-[var(--danger)]" aria-hidden />
           </div>
-          <div className="text-3xl font-extrabold text-rose-600 dark:text-rose-400">{overdue.length}</div>
-        </div>
+          <div className="mt-2.5 font-mono-data text-3xl font-bold text-[var(--danger)]">
+            {overdue.length}
+          </div>
+        </Link>
 
-        <div className="group glass-card p-4 md:p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              {t('nav.today')}
-            </span>
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-indigo-500/15 to-purple-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-200/40 dark:border-indigo-800/40 group-hover:scale-110 transition-transform">
-              <Star size={18} />
-            </div>
+        <Link to="/today" className="surface-interactive p-5">
+          <div className="flex items-center justify-between text-xs font-medium text-[var(--ink-secondary)]">
+            <span>{t('nav.today')}</span>
+            <Star size={15} className="text-[var(--accent)]" aria-hidden />
           </div>
-          <div className="text-3xl font-extrabold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <div className="mt-2.5 font-mono-data text-3xl font-bold text-[var(--ink)]">
             {today.filter(x => x.status !== 'done').length}
           </div>
-        </div>
+        </Link>
 
-        <div className="group glass-card p-4 md:p-5 rounded-2xl border border-slate-200/70 dark:border-slate-800/70 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              {t('nav.upcoming')}
-            </span>
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-tr from-amber-500/15 to-orange-500/15 text-amber-600 dark:text-amber-400 border border-amber-200/40 dark:border-amber-800/40 group-hover:scale-110 transition-transform">
-              <CalendarClock size={18} />
-            </div>
+        <Link to="/upcoming" className="surface-interactive p-5">
+          <div className="flex items-center justify-between text-xs font-medium text-[var(--ink-secondary)]">
+            <span>{t('nav.upcoming')}</span>
+            <CalendarClock size={15} className="text-[var(--warning)]" aria-hidden />
           </div>
-          <div className="text-3xl font-extrabold text-amber-600 dark:text-amber-400">{upcoming.length}</div>
-        </div>
+          <div className="mt-2.5 font-mono-data text-3xl font-bold text-[var(--ink)]">
+            {upcoming.length}
+          </div>
+        </Link>
       </div>
 
-      {/* Overdue Section */}
+      {/* Overdue Tasks */}
       {overdue.length > 0 && (
-        <section className="space-y-3">
+        <section className="space-y-2.5">
           <div className="flex items-center gap-2">
-            <AlertCircle size={18} className="text-rose-600" />
-            <h2 className="font-bold text-lg text-rose-600 tracking-tight">{t('task.overdue')}</h2>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold dark:bg-rose-950 dark:text-rose-300">
+            <AlertCircle size={16} className="text-[var(--danger)]" aria-hidden />
+            <h2 className="font-display text-base font-bold tracking-tight text-[var(--danger)]">
+              {t('task.overdue')}
+            </h2>
+            <span className="rounded-md bg-[var(--danger-soft)] px-1.5 py-0.5 font-mono-data text-xs font-semibold text-[var(--danger)]">
               {overdue.length}
             </span>
           </div>
-          <ul className="space-y-2.5">
+          <ul className="space-y-2">
             {overdue.map(x => (
               <TaskItem key={x.id} task={x} onOpen={openTask} />
             ))}
@@ -146,64 +149,74 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* Today Section */}
-      {today.length > 0 ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-indigo-600 dark:text-indigo-400" />
-              <h2 className="font-bold text-lg text-slate-800 dark:text-slate-100 tracking-tight">
-                {t('nav.today')}
-              </h2>
-            </div>
-          </div>
-          <ul className="space-y-2.5">
+      {/* Today Tasks */}
+      <section className="space-y-2.5">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 size={16} className="text-[var(--accent)]" aria-hidden />
+          <h2 className="font-display text-base font-bold tracking-tight text-[var(--ink)]">
+            {t('nav.today')}
+          </h2>
+          <span className="rounded-md bg-[var(--bg-subtle)] px-1.5 py-0.5 font-mono-data text-xs text-[var(--ink-muted)]">
+            {today.length}
+          </span>
+        </div>
+
+        {today.length > 0 ? (
+          <ul className="space-y-2">
             {today.map(x => (
               <TaskItem key={x.id} task={x} onOpen={openTask} />
             ))}
           </ul>
-        </section>
-      ) : (
-        <div className="p-8 text-center rounded-2xl glass-card border border-dashed border-slate-300 dark:border-slate-800">
-          <p className="text-slate-500 dark:text-slate-400 text-sm">{t('task.empty')}</p>
-        </div>
-      )}
+        ) : (
+          <div className="rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--bg-surface)]/60 p-8 text-center">
+            <p className="text-sm text-[var(--ink-muted)]">{t('task.empty')}</p>
+          </div>
+        )}
+      </section>
 
       {/* Active Projects Preview */}
-      {projects.filter(p => p.status === 'active').length > 0 && (
+      {activeProjects.length > 0 && (
         <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <FolderKanban size={18} className="text-slate-600 dark:text-slate-400" />
-            <h2 className="font-bold text-lg text-slate-800 dark:text-slate-100 tracking-tight">
-              {t('task.activeProjects')}
-            </h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FolderKanban size={16} className="text-[var(--ink-muted)]" aria-hidden />
+              <h2 className="font-display text-base font-bold tracking-tight text-[var(--ink)]">
+                {t('task.activeProjects')}
+              </h2>
+            </div>
+            <Link
+              to="/projects"
+              className="inline-flex items-center gap-1 text-xs font-medium text-[var(--accent)] hover:underline"
+            >
+              <span>{t('project.all')}</span>
+              <ArrowUpRight size={13} aria-hidden />
+            </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {projects
-              .filter(p => p.status === 'active')
-              .map(p => {
-                const prog = projectProgress(p.id, tasks)
-                return (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between rounded-2xl glass-card p-4 border border-slate-200/70 dark:border-slate-800/70 hover:-translate-y-0.5 transition-all shadow-xs"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: p.color }} />
-                      <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{p.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                      <span>{prog}%</span>
-                      <div className="h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-500"
-                          style={{ width: `${prog}%` }}
-                        />
-                      </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {activeProjects.map(p => {
+              const prog = projectProgress(p.id, tasks)
+              return (
+                <Link
+                  key={p.id}
+                  to={`/projects/${p.id}`}
+                  className="surface-interactive flex items-center justify-between p-4"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                    <span className="truncate text-sm font-semibold text-[var(--ink)]">{p.name}</span>
+                  </div>
+                  <div className="ml-3 flex shrink-0 items-center gap-2.5">
+                    <span className="font-mono-data text-xs font-medium text-[var(--ink-secondary)]">{prog}%</span>
+                    <div className="h-1.5 w-14 overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+                      <div
+                        className="h-full rounded-full bg-[var(--success)] transition-all duration-300"
+                        style={{ width: `${prog}%` }}
+                      />
                     </div>
                   </div>
-                )
-              })}
+                </Link>
+              )
+            })}
           </div>
         </section>
       )}

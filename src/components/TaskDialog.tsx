@@ -24,6 +24,8 @@ export default function TaskDialog({ task, open, onClose }: { task: Task | null;
   const [priority, setPriority] = useState<Priority>(0)
   const [projectId, setProjectId] = useState('')
 
+  const isExisting = Boolean(task?.id)
+
   useEffect(() => {
     const d = ref.current
     if (!d) return
@@ -44,11 +46,14 @@ export default function TaskDialog({ task, open, onClose }: { task: Task | null;
     e.preventDefault()
     if (!user || !title.trim()) return
     const data = {
-      title: title.trim(), description, priority,
+      title: title.trim(),
+      description,
+      priority,
       dueAt: due ? new Date(due).getTime() : null,
       projectId: projectId || null,
+      ...(task?.status && !isExisting ? { status: task.status } : {}),
     }
-    if (task) {
+    if (isExisting && task) {
       await updateTask(task.id, data)
       success(data.title, t('task.save'))
     } else {
@@ -59,55 +64,74 @@ export default function TaskDialog({ task, open, onClose }: { task: Task | null;
   }
 
   const handleDelete = async () => {
-    if (!task) return
+    if (!isExisting || !task) return
     await trashTask(task.id)
     success(task.title, t('task.delete'))
     onClose()
   }
-
-  const field =
-    'mt-1.5 w-full rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/60 dark:border-slate-700/80 dark:bg-slate-800/70 dark:text-slate-100 transition-all'
 
   return (
     <dialog
       ref={ref}
       onClose={onClose}
       aria-labelledby="task-dialog-title"
-      className="m-auto w-full max-w-lg rounded-3xl glass-panel p-7 shadow-2xl border border-slate-200/80 dark:border-slate-800/80 backdrop:bg-slate-950/60 backdrop:backdrop-blur-sm"
+      className="surface-elevated m-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl p-6 text-[var(--ink)]"
     >
       <form onSubmit={submit} className="space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
-          <h2 id="task-dialog-title" className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            {task ? t('task.edit') : t('task.new')}
+        <div className="flex items-center justify-between border-b border-[var(--border)] pb-3">
+          <h2 id="task-dialog-title" className="font-display text-lg font-bold tracking-tight text-[var(--ink)]">
+            {isExisting ? t('task.edit') : t('task.new')}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+            aria-label={t('common.close')}
+            className="grid h-8 w-8 place-items-center rounded-lg text-[var(--ink-muted)] hover:bg-[var(--bg-subtle)] hover:text-[var(--ink)] transition-colors cursor-pointer"
           >
-            <X size={18} />
+            <X size={17} />
           </button>
         </div>
 
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+        <label className="block text-xs font-medium text-[var(--ink-secondary)]">
           {t('task.title')}
-          <input className={field} required maxLength={200} value={title} onChange={e => setTitle(e.target.value)} />
+          <input
+            className="input-field mt-1.5"
+            required
+            maxLength={200}
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+          />
         </label>
 
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+        <label className="block text-xs font-medium text-[var(--ink-secondary)]">
           {t('task.description')}
-          <textarea className={field} rows={3} maxLength={5000} value={description} onChange={e => setDescription(e.target.value)} />
+          <textarea
+            className="input-field mt-1.5 resize-y"
+            rows={3}
+            maxLength={5000}
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+          />
         </label>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-medium text-[var(--ink-secondary)]">
             {t('task.due')}
-            <input type="datetime-local" className={field} value={due} onChange={e => setDue(e.target.value)} />
+            <input
+              type="datetime-local"
+              className="input-field mt-1.5 font-mono-data text-xs"
+              value={due}
+              onChange={e => setDue(e.target.value)}
+            />
           </label>
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <label className="block text-xs font-medium text-[var(--ink-secondary)]">
             {t('task.priority')}
-            <select className={field} value={priority} onChange={e => setPriority(Number(e.target.value) as Priority)}>
-              {[0, 1, 2, 3, 4].map(p => (
+            <select
+              className="input-field mt-1.5"
+              value={priority}
+              onChange={e => setPriority(Number(e.target.value) as Priority)}
+            >
+              {([0, 1, 2, 3, 4] as const).map(p => (
                 <option key={p} value={p}>
                   {t(`task.p${p}`)}
                 </option>
@@ -116,9 +140,13 @@ export default function TaskDialog({ task, open, onClose }: { task: Task | null;
           </label>
         </div>
 
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+        <label className="block text-xs font-medium text-[var(--ink-secondary)]">
           {t('task.project')}
-          <select className={field} value={projectId} onChange={e => setProjectId(e.target.value)}>
+          <select
+            className="input-field mt-1.5"
+            value={projectId}
+            onChange={e => setProjectId(e.target.value)}
+          >
             <option value="">{t('task.none')}</option>
             {projects.map(p => (
               <option key={p.id} value={p.id}>
@@ -128,34 +156,29 @@ export default function TaskDialog({ task, open, onClose }: { task: Task | null;
           </select>
         </label>
 
-        {task && user && <SubtaskList parent={task} subtasks={subtasksOf(tasks, task.id)} uid={user.uid} />}
+        {isExisting && task && user && (
+          <SubtaskList parent={task} subtasks={subtasksOf(tasks, task.id)} uid={user.uid} />
+        )}
 
-        <div className="flex items-center justify-between pt-4 border-t border-slate-200/60 dark:border-slate-800/60">
-          {task ? (
+        <div className="flex items-center justify-between border-t border-[var(--border)] pt-4">
+          {isExisting ? (
             <button
               type="button"
-              className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 p-2 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-[var(--danger)] hover:bg-[var(--danger-soft)] transition-colors cursor-pointer"
               onClick={handleDelete}
             >
-              <Trash2 size={16} />
+              <Trash2 size={15} />
               <span>{t('task.delete')}</span>
             </button>
           ) : (
             <span />
           )}
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-2xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition cursor-pointer"
-            >
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={onClose} className="btn-ghost px-4 py-2 text-sm">
               {t('task.cancel')}
             </button>
-            <button
-              type="submit"
-              className="btn-gradient-primary rounded-2xl px-5 py-2 text-sm font-semibold cursor-pointer"
-            >
+            <button type="submit" className="btn-primary px-5 py-2 text-sm">
               {t('task.save')}
             </button>
           </div>

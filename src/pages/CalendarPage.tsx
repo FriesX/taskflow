@@ -43,12 +43,18 @@ export default function CalendarPage() {
 
   return (
     <div className="max-w-6xl space-y-6">
-      <h1 className="text-2xl font-bold">{t('nav.calendar')}</h1>
+      <div className="border-b border-[var(--border)] pb-4">
+        <h1 className="font-display text-2xl font-bold tracking-[-0.025em] text-[var(--ink)] sm:text-3xl">
+          {t('nav.calendar')}
+        </h1>
+      </div>
+
       <CalendarView
         tasks={activeTasks}
         onOpen={openTask}
         onAddTaskDate={handleAddTaskDate}
       />
+
       <TaskDialog
         task={editing}
         open={open}
