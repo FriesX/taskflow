@@ -65,7 +65,7 @@ const MOBILE_TABS = [
 export default function Layout() {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const { tasks, pendingSocialCount } = useData()
+  const { tasks, profile, pendingSocialCount } = useData()
   const location = useLocation()
   const [drawerPath, setDrawerPath] = useState<string | null>(null)
   const [isDark, setIsDark] = useState(() => resolveDark(getTheme()))
@@ -86,7 +86,7 @@ export default function Layout() {
     trash: tasks.filter(isDeleted).length,
   }
 
-  const displayName = user?.displayName || user?.email?.split('@')[0] || 'User'
+  const displayName = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'User'
   const initials = displayName.slice(0, 2).toUpperCase()
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>

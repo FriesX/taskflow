@@ -23,7 +23,7 @@ import { DashboardSkeleton } from '../components/Skeleton'
 export default function Dashboard() {
   const { t } = useTranslation()
   const { user } = useAuth()
-  const { tasks, projects, ready } = useData()
+  const { tasks, projects, profile, ready } = useData()
   const [editing, setEditing] = useState<Task | null>(null)
   const [open, setOpen] = useState(false)
   const [now] = useState(() => new Date())
@@ -41,7 +41,7 @@ export default function Dashboard() {
   const upcoming = live.filter(x => isUpcoming(x) && x.status !== 'done')
   const hour = now.getHours()
   const greeting = hour < 12 ? 'greetingMorning' : hour < 18 ? 'greetingAfternoon' : 'greetingEvening'
-  const name = user?.displayName ?? user?.email?.split('@')[0] ?? ''
+  const name = profile?.displayName || user?.displayName || user?.email?.split('@')[0] || ''
   const openTask = (task: Task) => {
     setEditing(task)
     setOpen(true)

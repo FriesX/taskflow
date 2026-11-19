@@ -6,6 +6,7 @@ import {
   getProfilesByIds,
   subscribeFriendships,
   subscribeIncomingProjectInvites,
+  subscribeOwnProfile,
 } from '../services/social'
 import { mergeUniqueTasks } from '../lib/socialLogic'
 import type { Friendship, Label, Project, ProjectInvite, Task, UserProfile } from '../types'
@@ -72,6 +73,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }),
       subscribeProjects(uid, setProjects),
       subscribeLabels(uid, setLabels),
+      subscribeOwnProfile(uid, p => {
+        if (!p) return
+        setProfile(p)
+        setProfiles(prev => ({ ...prev, [p.uid]: p }))
+        fetchedUidsRef.current.add(p.uid)
+      }),
       subscribeFriendships(uid, setFriendships),
       subscribeIncomingProjectInvites(uid, setIncomingProjectInvites),
     ]

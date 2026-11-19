@@ -4,6 +4,7 @@ import {
   friendshipPairId,
   generateFriendCode,
   mergeUniqueTasks,
+  normalizeDisplayName,
   normalizeFriendLookup,
   projectInviteId,
   sortedPair,
@@ -82,5 +83,14 @@ describe('socialLogic', () => {
     expect(merged).toHaveLength(3)
     expect(merged.find(t => t.id === 't1')?.title).toBe('Updated t1')
     expect(merged.find(t => t.id === 't3')?.ownerId).toBe('bob')
+  })
+
+  it('normalizes and validates user display names', () => {
+    expect(normalizeDisplayName('  Edgar   Pratama  ')).toBe('Edgar Pratama')
+    expect(normalizeDisplayName('A')).toBe('A')
+    expect(normalizeDisplayName('   ')).toBeNull()
+    expect(normalizeDisplayName('')).toBeNull()
+    expect(normalizeDisplayName('a'.repeat(101))).toBeNull()
+    expect(normalizeDisplayName('a'.repeat(100))).toBe('a'.repeat(100))
   })
 })

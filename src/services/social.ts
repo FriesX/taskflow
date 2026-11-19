@@ -1,4 +1,4 @@
-import type { User } from 'firebase/auth'
+import { updateProfile, type User } from 'firebase/auth'
 import {
   arrayRemove,
   arrayUnion,
@@ -17,6 +17,7 @@ import { db } from '../lib/firebase'
 import {
   friendshipPairId,
   generateFriendCode,
+  normalizeDisplayName,
   normalizeFriendLookup,
   projectInviteId,
   sortedPair,
@@ -61,15 +62,12 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
 
   if (snap.exists()) {
     const existing = snap.data() as UserProfile
-    const needsRefresh =
-      existing.displayName !== displayName ||
-      existing.photoURL !== photoURL ||
-      existing.email !== email
+    // Preserve customized displayName; only sync photoURL or email changes from Auth
+    const needsRefresh = existing.photoURL !== photoURL || existing.email !== email
 
     if (needsRefresh) {
       const updated: UserProfile = {
         ...existing,
-        displayName,
         email,
         photoURL,
         updatedAt: now,
@@ -117,6 +115,52 @@ export async function ensureUserProfile(user: User): Promise<UserProfile> {
   }
   await batch.commit()
   return profile
+}
+
+/** Realtime subscription for the signed-in user's own profile document. */
+export function subscribeOwnProfile(uid: string, cb: (profile: UserProfile | null) => void) {
+  return onSnapshot(doc(db, 'profiles', uid), snap => {
+    cb(snap.exists() ? (snap.data() as UserProfile) : null)
+  })
+}
+
+/**
+ * Updates the user's display name across Firebase Auth and Firestore (`profiles`,
+ * `friendCodes`, and `emailIndex`) atomically.
+ */
+export async function updateUserDisplayName(
+  user: User,
+  currentProfile: UserProfile | null,
+  rawName: string,
+): Promise<UserProfile> {
+  const cleanName = normalizeDisplayName(rawName)
+  if (!cleanName) {
+    throw new Error('INVALID_DISPLAY_NAME')
+  }
+
+  const base = currentProfile ?? (await ensureUserProfile(user))
+  const updated: UserProfile = {
+    ...base,
+    displayName: cleanName,
+    updatedAt: Date.now(),
+  }
+
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'profiles', base.uid), updated)
+  batch.set(doc(db, 'friendCodes', base.friendCode), updated)
+  const emailLower = base.email.trim().toLowerCase()
+  if (emailLower) {
+    batch.set(doc(db, 'emailIndex', emailLower), updated)
+  }
+  await batch.commit()
+
+  try {
+    await updateProfile(user, { displayName: cleanName })
+  } catch (err) {
+    console.warn('[TaskFlow] Auth displayName sync warning:', err)
+  }
+
+  return updated
 }
 
 /** Exact-match lookup by email or `TF-XXXX` friend code. */

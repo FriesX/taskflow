@@ -54,6 +54,13 @@ export function generateFriendCode(length = 4): string {
   return `TF-${out}`
 }
 
+/** Trims and collapses inner whitespace in a display name; returns null if empty or >100 chars. */
+export function normalizeDisplayName(raw: string): string | null {
+  const cleaned = raw.trim().replace(/\s+/g, ' ')
+  if (cleaned.length < 1 || cleaned.length > 100) return null
+  return cleaned
+}
+
 /** Splits an array into fixed-size chunks (used for Firestore `in` query limit of 30). */
 export function chunkArray<T>(items: readonly T[], size = 30): T[][] {
   if (size <= 0) return []
